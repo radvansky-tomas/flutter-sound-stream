@@ -50,7 +50,7 @@ public class SwiftSoundStreamPlugin: NSObject, FlutterPlugin {
     /** ======== Basic Plugin initialization ======== **/
     
     public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "vn.casperpas.sound_stream:methods", binaryMessenger: registrar.messenger())
+        let channel = FlutterMethodChannel(name: "nz.co.rdev.sound_stream:methods", binaryMessenger: registrar.messenger())
         let instance = SwiftSoundStreamPlugin( channel, registrar: registrar)
         registrar.addMethodCallDelegate(instance, channel: channel)
     }

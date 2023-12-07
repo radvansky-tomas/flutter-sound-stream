@@ -1,4 +1,4 @@
-package vn.casperpas.sound_stream
+package nz.co.rdev.sound_stream
 
 import android.Manifest
 import android.app.Activity
@@ -25,7 +25,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
 
-const val methodChannelName = "vn.casperpas.sound_stream:methods"
+const val methodChannelName = "nz.co.rdev.sound_stream:methods"
 
 enum class SoundStreamErrors {
     FailedToRecord,

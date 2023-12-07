@@ -19,7 +19,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: vn.casperpas.sound_stream
+        package: nz.co.rdev.sound_stream
         pluginClass: SoundStreamPlugin
       ios:
         pluginClass: SoundStreamPlugin
