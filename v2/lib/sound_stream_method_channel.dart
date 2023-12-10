@@ -8,11 +8,15 @@ import 'sound_stream_platform_interface.dart';
 
 /// An implementation of [SoundStreamPlatform] that uses method channels.
 class MethodChannelSoundStream extends SoundStreamPlatform {
+  MethodChannelSoundStream() {
+    _initSoundStream();
+  }
+
   /// The method channel used to interact with the native platform.
   @visibleForTesting
   final methodChannel = const MethodChannel('sound_stream');
 
-  Future<void> initSoundStream() async {
+  Future<void> _initSoundStream() async {
     methodChannel.setMethodCallHandler(_onMethodCall);
   }
 

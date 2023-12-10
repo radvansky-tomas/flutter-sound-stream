@@ -46,15 +46,15 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var mPlayerBufferSize: AVAudioFrameCount = 8192
     private var mPlayerOutputFormat: AVAudioFormat!
     private var mPlayerInputFormat: AVAudioFormat!
-
+    
     /** ======== Basic Plugin initialization ======== **/
-  public static func register(with registrar: FlutterPluginRegistrar) {
-    let channel = FlutterMethodChannel(name: "sound_stream", binaryMessenger: registrar.messenger())
-    let instance = SoundStreamPlugin()
-    registrar.addMethodCallDelegate(instance, channel: channel)
-  }
-
-  init( _ channel: FlutterMethodChannel, registrar: FlutterPluginRegistrar ) {
+    public static func register(with registrar: FlutterPluginRegistrar) {
+        let channel = FlutterMethodChannel(name: "sound_stream", binaryMessenger: registrar.messenger())
+        let instance = SoundStreamPlugin(channel, registrar:registrar)
+        registrar.addMethodCallDelegate(instance, channel: channel)
+    }
+    
+    init( _ channel: FlutterMethodChannel, registrar: FlutterPluginRegistrar ) {
         self.channel = channel
         self.registrar = registrar
         self.mInputNode = mAudioEngine.inputNode
@@ -64,9 +64,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         self.attachPlayer()
         self.initEngine()
     }
-
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-     switch call.method {
+    
+    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
         case "hasPermission":
             hasPermission(result)
         case "usingSpeaker":
@@ -91,8 +91,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             print("Unrecognized method: \(call.method)")
             sendResult(result, FlutterMethodNotImplemented)
         }
-  }
- private func sendResult(_ result: @escaping FlutterResult, _ arguments: Any?) {
+    }
+    private func sendResult(_ result: @escaping FlutterResult, _ arguments: Any?) {
         DispatchQueue.main.async {
             result( arguments )
         }
@@ -113,11 +113,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
         
         var permission: AVAudioSession.RecordPermission
-        #if swift(>=4.2)
+#if swift(>=4.2)
         permission = AVAudioSession.sharedInstance().recordPermission
-        #else
+#else
         permission = AVAudioSession.sharedInstance().recordPermission()
-        #endif
+#endif
         switch permission {
         case .granted:
             print("granted")
@@ -192,11 +192,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func initializeRecorder(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         guard let argsArr = call.arguments as? Dictionary<String,AnyObject>
-            else {
-                sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
-                                                 message:"Incorrect parameters",
-                                                 details: nil ))
-                return
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
+                                             message:"Incorrect parameters",
+                                             details: nil ))
+            return
         }
         mRecordSampleRate = argsArr["sampleRate"] as? Double ?? mRecordSampleRate
         debugLogging = argsArr["showLogs"] as? Bool ?? debugLogging
@@ -273,11 +273,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func initializePlayer(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         guard let argsArr = call.arguments as? Dictionary<String,AnyObject>
-            else {
-                sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
-                                                 message:"Incorrect parameters",
-                                                 details: nil ))
-                return
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
+                                             message:"Incorrect parameters",
+                                             details: nil ))
+            return
         }
         
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate
@@ -288,11 +288,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func usePhoneSpeaker(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         guard let argsArr = call.arguments as? Dictionary<String,AnyObject>
-            else {
-                sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
-                                                 message:"Incorrect parameters",
-                                                 details: nil ))
-                return
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
+                                             message:"Incorrect parameters",
+                                             details: nil ))
+            return
         }
         let useSpeaker = argsArr["value"] as? Bool ?? false
         
@@ -369,7 +369,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
                 .allowAirPlay
             ])
         try! session.setActive(true)
-
+        
         mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
         
         mAudioEngine.attach(mPlayerNode)
@@ -399,12 +399,12 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func writeChunk(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
         guard let argsArr = call.arguments as? Dictionary<String,AnyObject>,
-            let data = argsArr["data"] as? FlutterStandardTypedData
-            else {
-                sendResult(result, FlutterError( code: SoundStreamErrors.FailedToWriteBuffer.rawValue,
-                                                 message:"Failed to write Player buffer",
-                                                 details: nil ))
-                return
+              let data = argsArr["data"] as? FlutterStandardTypedData
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.FailedToWriteBuffer.rawValue,
+                                             message:"Failed to write Player buffer",
+                                             details: nil ))
+            return
         }
         let byteData = [UInt8](data.data)
         pushPlayerChunk(byteData, result)
