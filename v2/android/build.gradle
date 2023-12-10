@@ -28,7 +28,6 @@ android {
     if (project.android.hasProperty("namespace")) {
         namespace 'nz.co.rdev.sound_stream'
     }
-
     compileSdkVersion 33
 
     compileOptions {
@@ -44,10 +43,10 @@ android {
         main.java.srcDirs += 'src/main/kotlin'
         test.java.srcDirs += 'src/test/kotlin'
     }
-
     defaultConfig {
-        minSdkVersion 19
+        minSdk 21
     }
+
 
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'

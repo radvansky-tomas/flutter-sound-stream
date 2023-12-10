@@ -1,11 +1,22 @@
 package nz.co.rdev.sound_stream
 
-import androidx.annotation.NonNull
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.*
+import android.media.AudioRecord.OnRecordPositionUpdateListener
+import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.PluginRegistry
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
@@ -35,7 +46,7 @@ class SoundStreamPlugin :
   ///
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
   /// when the Flutter Engine is detached from the Activity
-  private lateinit var channel: MethodChannel
+  private lateinit var methodChannel: MethodChannel
 
   private val logTag = "SoundStreamPlugin"
   private val audioRecordPermissionCode = 14887
@@ -59,6 +70,7 @@ class SoundStreamPlugin :
   private var mAudioManager: AudioManager? = null
   private var mPlayerSampleRate = 16000 // 16Khz
   private var mPlayerBufferSize = 10240
+
   private var mPlayerFormat: AudioFormat =
       AudioFormat.Builder()
           .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
@@ -68,8 +80,9 @@ class SoundStreamPlugin :
 
   /** ======== Basic Plugin initialization ======== */
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-    channel = MethodChannel(flutterPluginBinding.binaryMessenger, "sound_stream")
-    channel.setMethodCallHandler(this)
+    pluginContext = flutterPluginBinding.applicationContext;
+    methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "sound_stream")
+    methodChannel.setMethodCallHandler(this)
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
@@ -92,8 +105,11 @@ class SoundStreamPlugin :
     }
   }
 
+  override fun onDetachedFromActivity() {
+//        currentActivity
+  }
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-    channel.setMethodCallHandler(null)
+    methodChannel.setMethodCallHandler(null)
     mListener?.onMarkerReached(null)
     mListener?.onPeriodicNotification(null)
     mListener = null
@@ -151,10 +167,10 @@ class SoundStreamPlugin :
   ): Boolean {
     when (requestCode) {
       audioRecordPermissionCode -> {
-        if (grantResults != null) {
+
           permissionToRecordAudio =
               grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        }
+
         completeInitializeRecorder()
         return true
       }
@@ -162,7 +178,7 @@ class SoundStreamPlugin :
     return false
   }
 
-  private fun initializeRecorder(@NonNull call: MethodCall, @NonNull result: Result) {
+  private fun initializeRecorder( call: MethodCall,  result: Result) {
     initAudioManager()
     mRecordSampleRate = call.argument<Int>("sampleRate") ?: mRecordSampleRate
     debugLogging = call.argument<Boolean>("showLogs") ?: false
@@ -202,11 +218,11 @@ class SoundStreamPlugin :
             mRecordFormat,
             mRecorderBufferSize
         )
-    if (mRecorder != null) {
+
       mListener = createRecordListener()
       mRecorder?.positionNotificationPeriod = mPeriodFrames
       mRecorder?.setRecordPositionUpdateListener(mListener)
-    }
+
   }
 
   private fun completeInitializeRecorder() {
@@ -243,7 +259,7 @@ class SoundStreamPlugin :
 
   private fun startRecording(result: Result) {
     try {
-      if (mRecorder!!.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+      if (mRecorder?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
         result.success(true)
         return
       }
@@ -289,7 +305,7 @@ class SoundStreamPlugin :
     mAudioManager = currentActivity?.getSystemService(Context.AUDIO_SERVICE) as AudioManager
   }
 
-  private fun initializePlayer(@NonNull call: MethodCall, @NonNull result: Result) {
+  private fun initializePlayer(call: MethodCall, result: Result) {
     initAudioManager()
     mPlayerSampleRate = call.argument<Int>("sampleRate") ?: mPlayerSampleRate
     debugLogging = call.argument<Boolean>("showLogs") ?: false
@@ -333,14 +349,14 @@ class SoundStreamPlugin :
     sendPlayerStatus(SoundStreamStatus.Initialized)
   }
 
-  private fun usePhoneSpeaker(@NonNull call: MethodCall, @NonNull result: Result) {
+  private fun usePhoneSpeaker(call: MethodCall, result: Result) {
     val useSpeaker = call.argument<Boolean>("value") ?: false
     mAudioManager?.mode =
         if (useSpeaker) AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
     result.success(true)
   }
 
-  private fun writeChunk(@NonNull call: MethodCall, @NonNull result: Result) {
+  private fun writeChunk(call: MethodCall, result: Result) {
     val data = call.argument<ByteArray>("data")
     if (data != null) {
       pushPlayerChunk(data, result)
@@ -406,7 +422,7 @@ class SoundStreamPlugin :
     sendEventMethod("playerStatus", status.name)
   }
 
-  private fun createRecordListener(): OnRecordPositionUpdateListener? {
+  private fun createRecordListener(): OnRecordPositionUpdateListener {
     return object : OnRecordPositionUpdateListener {
       override fun onMarkerReached(recorder: AudioRecord) {
         recorder.read(audioData!!, 0, mRecorderBufferSize)
