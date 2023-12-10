@@ -10,16 +10,17 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
-import io.flutter.embedding.engine.plugins.activity.ActivityAware
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
+
 
 enum class SoundStreamErrors {
   FailedToRecord,
@@ -97,6 +98,7 @@ class SoundStreamPlugin :
         "startPlayer" -> startPlayer(result)
         "stopPlayer" -> stopPlayer(result)
         "writeChunk" -> writeChunk(call, result)
+        "checkCurrentTime" -> checkCurrentTime(call, result)
         else -> result.notImplemented()
       }
     } catch (e: Exception) {
@@ -354,6 +356,20 @@ class SoundStreamPlugin :
     mAudioManager?.mode =
         if (useSpeaker) AudioManager.MODE_IN_COMMUNICATION else AudioManager.MODE_NORMAL
     result.success(true)
+  }
+
+  private fun checkCurrentTime(call: MethodCall, result: Result){
+    val audioTimestamp = AudioTimestamp()
+    val success = mAudioTrack?.getTimestamp(audioTimestamp)
+    if (success == true) {
+      debugLog(audioTimestamp.framePosition.toString());
+      val framePosition = audioTimestamp.framePosition
+      val timeInSeconds = framePosition.toDouble() / mPlayerSampleRate
+      result.success(timeInSeconds)
+    } else {
+      // getTimestamp failed
+      result.error("internal","getTimeStampFailed",null);
+    }
   }
 
   private fun writeChunk(call: MethodCall, result: Result) {

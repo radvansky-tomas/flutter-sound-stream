@@ -29,6 +29,10 @@ class SoundStream {
     return SoundStreamPlatform.instance.writeChunk(data);
   }
 
+  Future<double> checkCurrentTime()async{
+    final double time = await SoundStreamPlatform.instance.checkCurrentTime();
+    return time;
+  }
   Stream<SoundStreamStatus> get playerStatus =>
       SoundStreamPlatform.instance.playerStatus;
 

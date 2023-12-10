@@ -87,11 +87,22 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             stopPlayer(result)
         case "writeChunk":
             writeChunk(call, result)
+        case "checkCurrentTime":
+            checkCurrentTime(result)
         default:
             print("Unrecognized method: \(call.method)")
             sendResult(result, FlutterMethodNotImplemented)
         }
     }
+    
+    private func checkCurrentTime(_ result: @escaping FlutterResult)  {
+        if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
+            sendResult(result, Double(Double(playerTime.sampleTime) / playerTime.sampleRate));
+            return;
+        }
+     sendResult(result, 0)
+    }
+    
     private func sendResult(_ result: @escaping FlutterResult, _ arguments: Any?) {
         DispatchQueue.main.async {
             result( arguments )
@@ -374,6 +385,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mAudioEngine.attach(mPlayerNode)
         mAudioEngine.connect(mPlayerNode, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
+        
     }
     
     private func startPlayer(_ result: @escaping FlutterResult) {
