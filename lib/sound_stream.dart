@@ -1,44 +1,82 @@
-library sound_stream;
+// ignore_for_file: constant_identifier_names
 
 import 'dart:async';
-import 'package:flutter/services.dart';
+import 'dart:typed_data';
 
-part 'recorder_stream.dart';
-part 'player_stream.dart';
+import 'package:sound_stream/utils.dart';
 
-const MethodChannel _methodChannel =
-    const MethodChannel('nz.co.rdev.sound_stream:methods');
-
-final _eventsStreamController = StreamController<dynamic>.broadcast();
-
-enum SoundStreamStatus {
-  Unset,
-  Initialized,
-  Playing,
-  Stopped,
-}
+import 'sound_stream_platform_interface.dart';
 
 class SoundStream {
-  static final SoundStream _instance = SoundStream._internal();
-  factory SoundStream() => _instance;
-  SoundStream._internal() {
-    _methodChannel.setMethodCallHandler(_onMethodCall);
+  /// Player
+  Future<dynamic> initializePlayer({
+    int sampleRate = 16000,
+    bool showLogs = false,
+  }) {
+    return SoundStreamPlatform.instance
+        .initializePlayer(sampleRate: sampleRate, showLogs: showLogs);
   }
 
-  /// Return [RecorderStream] instance (Singleton).
-  RecorderStream get recorder => RecorderStream();
-
-  /// Return [PlayerStream] instance (Singleton).
-  PlayerStream get player => PlayerStream();
-
-  Future<dynamic> _onMethodCall(MethodCall call) async {
-    switch (call.method) {
-      case "platformEvent":
-        _eventsStreamController.add(call.arguments);
-        break;
-    }
-    return null;
+  Future<dynamic> startPlayer() {
+    return SoundStreamPlatform.instance.startPlayer();
   }
+
+  Future<dynamic> stopPlayer() {
+    return SoundStreamPlatform.instance.stopPlayer();
+  }
+
+  Future<dynamic> writeChunk(Uint8List data) {
+    return SoundStreamPlatform.instance.writeChunk(data);
+  }
+
+  Future<double> checkCurrentTime()async{
+    final double time = await SoundStreamPlatform.instance.checkCurrentTime();
+    return time;
+  }
+
+  Future<Uint8List> getPlayerBuffer()async{
+    final Uint8List buffer = await SoundStreamPlatform.instance.getPlayerBuffer();
+    return buffer;
+  }
+
+  Stream<SoundStreamStatus> get playerStatus =>
+      SoundStreamPlatform.instance.playerStatus;
+
+  StreamSink<Uint8List> get playerAudioStream =>
+      SoundStreamPlatform.instance.playerAudioStream;
+
+  Future<dynamic> usePhoneSpeaker(bool value) {
+    return SoundStreamPlatform.instance.usePhoneSpeaker(value);
+  }
+
+  Future<dynamic> changePlayerSpeed(double speed) {
+    return SoundStreamPlatform.instance.changePlayerSpeed(speed);
+  }
+
+  Future<dynamic> seek(double seekTime) {
+    return SoundStreamPlatform.instance.seek(seekTime);
+  }
+
+  /// Recorder
+  Future<dynamic> initializeRecorder({
+    int sampleRate = 16000,
+    bool showLogs = false,
+  }) {
+    return SoundStreamPlatform.instance
+        .initializeRecorder(sampleRate: sampleRate, showLogs: showLogs);
+  }
+
+  Future<dynamic> startRecorder() {
+    return SoundStreamPlatform.instance.startRecorder();
+  }
+
+  Future<dynamic> stopRecorder() {
+    return SoundStreamPlatform.instance.stopRecorder();
+  }
+
+  Stream<SoundStreamStatus> get recorderStatus =>
+      SoundStreamPlatform.instance.recorderStatus;
+
+  Stream<Uint8List> get recorderAudioStream =>
+      SoundStreamPlatform.instance.recorderAudioStream;
 }
-
-String _enumToString(Object o) => o.toString().split('.').last;

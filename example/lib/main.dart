@@ -1,8 +1,9 @@
-import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:sound_stream/sound_stream.dart';
+import 'package:sound_stream/utils.dart';
 
 void main() {
   runApp(MyApp());
@@ -14,8 +15,7 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  RecorderStream _recorder = RecorderStream();
-  PlayerStream _player = PlayerStream();
+  SoundStream soundStream = SoundStream();
 
   List<Uint8List> _micChunks = [];
   bool _isRecording = false;
@@ -42,22 +42,22 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlugin() async {
-    _recorderStatus = _recorder.status.listen((status) {
+    _recorderStatus = soundStream.recorderStatus.listen((status) {
       if (mounted)
         setState(() {
           _isRecording = status == SoundStreamStatus.Playing;
         });
     });
 
-    _audioStream = _recorder.audioStream.listen((data) {
+    _audioStream = soundStream.recorderAudioStream.listen((data) {
       if (_isPlaying) {
-        _player.writeChunk(data);
+        soundStream.writeChunk(data);
       } else {
         _micChunks.add(data);
       }
     });
 
-    _playerStatus = _player.status.listen((status) {
+    _playerStatus = soundStream.playerStatus.listen((status) {
       if (mounted)
         setState(() {
           _isPlaying = status == SoundStreamStatus.Playing;
@@ -65,18 +65,18 @@ class _MyAppState extends State<MyApp> {
     });
 
     await Future.wait([
-      _recorder.initialize(),
-      _player.initialize(),
+      soundStream.initializeRecorder(),
+      soundStream.initializePlayer(),
     ]);
     // _player.usePhoneSpeaker(_useSpeaker);
   }
 
   void _play() async {
-    await _player.start();
+    await soundStream.startPlayer();
 
     if (_micChunks.isNotEmpty) {
       for (var chunk in _micChunks) {
-        await _player.writeChunk(chunk);
+        await soundStream.writeChunk(chunk);
       }
       _micChunks.clear();
     }
@@ -98,12 +98,22 @@ class _MyAppState extends State<MyApp> {
                 IconButton(
                   iconSize: 96.0,
                   icon: Icon(_isRecording ? Icons.mic_off : Icons.mic),
-                  onPressed: _isRecording ? _recorder.stop : _recorder.start,
+                  onPressed: _isRecording
+                      ? soundStream.stopRecorder
+                      : soundStream.startRecorder,
+                ),
+                IconButton(
+                  iconSize: 96.0,
+                  icon: Icon(Icons.music_note),
+                  onPressed: (){
+                    // Load mp3
+
+                  }
                 ),
                 IconButton(
                   iconSize: 96.0,
                   icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
-                  onPressed: _isPlaying ? _player.stop : _play,
+                  onPressed: _isPlaying ? soundStream.stopPlayer : _play,
                 ),
               ],
             ),
@@ -113,10 +123,44 @@ class _MyAppState extends State<MyApp> {
               onPressed: () {
                 setState(() {
                   _useSpeaker = !_useSpeaker;
-                  _player.usePhoneSpeaker(_useSpeaker);
+                  soundStream.usePhoneSpeaker(_useSpeaker);
                 });
               },
             ),
+            Row(children: [
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.lock_clock),
+                onPressed: () async {
+                  final time =  await soundStream.checkCurrentTime();
+                  print(time);
+                },
+              ),
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.skip_next),
+                onPressed: () async {
+                  await soundStream.seek(1);
+                },
+              ),
+            ],),
+            Row(children: [
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.data_array),
+                onPressed: () async {
+                  final buffer =  await soundStream.getPlayerBuffer();
+                  print(buffer.length);
+                },
+              ),
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.speed),
+                onPressed: () async {
+                   await soundStream.changePlayerSpeed(2.0);
+                },
+              ),
+            ],)
           ],
         ),
       ),

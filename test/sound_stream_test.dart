@@ -1,18 +1,29 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sound_stream/sound_stream.dart';
+import 'package:sound_stream/sound_stream_platform_interface.dart';
+import 'package:sound_stream/sound_stream_method_channel.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+
+class MockSoundStreamPlatform
+    with MockPlatformInterfaceMixin
+    implements SoundStreamPlatform {
+
+  @override
+  Future<String?> getPlatformVersion() => Future.value('42');
+}
 
 void main() {
-  const MethodChannel channel = MethodChannel('sound_stream');
+  final SoundStreamPlatform initialPlatform = SoundStreamPlatform.instance;
 
-  TestWidgetsFlutterBinding.ensureInitialized();
-
-  setUp(() {
-    channel.setMockMethodCallHandler((MethodCall methodCall) async {
-      return '42';
-    });
+  test('$MethodChannelSoundStream is the default instance', () {
+    expect(initialPlatform, isInstanceOf<MethodChannelSoundStream>());
   });
 
-  tearDown(() {
-    channel.setMockMethodCallHandler(null);
+  test('getPlatformVersion', () async {
+    SoundStream soundStreamPlugin = SoundStream();
+    MockSoundStreamPlatform fakePlatform = MockSoundStreamPlatform();
+    SoundStreamPlatform.instance = fakePlatform;
+
+    expect(await soundStreamPlugin.getPlatformVersion(), '42');
   });
 }
