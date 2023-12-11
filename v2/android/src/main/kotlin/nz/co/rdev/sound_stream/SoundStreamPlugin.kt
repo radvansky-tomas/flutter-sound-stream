@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.*
 import android.media.AudioRecord.OnRecordPositionUpdateListener
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -105,6 +107,7 @@ class SoundStreamPlugin :
         "getPlayerBuffer" -> getPlayerBuffer(call, result)
         "writeChunk" -> writeChunk(call, result)
         "seek" -> seek(call, result)
+        "changePlayerSpeed" -> changePlayerSpeed(call, result)
         "checkCurrentTime" -> checkCurrentTime(call, result)
         else -> result.notImplemented()
       }
@@ -347,6 +350,7 @@ class SoundStreamPlugin :
     mPlayerTimer?.cancel()
     mPlayerTimer = null
   }
+
   private fun initializePlayer(call: MethodCall, result: Result) {
     initAudioManager()
     stopTimer()
@@ -377,17 +381,23 @@ class SoundStreamPlugin :
             .setLegacyStreamType(AudioManager.STREAM_MUSIC)
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+
             .build()
     mAudioTrack =
         AudioTrack(
             audioAttributes,
             mPlayerFormat,
-            mPlayerBufferSize,
+            mPlayerBufferSize * 4,
             AudioTrack.MODE_STREAM,
             AudioManager.AUDIO_SESSION_ID_GENERATE
         )
-
     mAudioManager?.mode = AudioManager.MODE_NORMAL
+    /// Reset playback speed?
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      val playbackParams = PlaybackParams()
+      playbackParams.speed = 1.0f
+      mAudioTrack?.playbackParams = playbackParams
+    }
 
     result.success(true)
     sendPlayerStatus(SoundStreamStatus.Initialized)
@@ -422,6 +432,25 @@ class SoundStreamPlugin :
 
     result.success(byteBuffer.array());
   }
+
+  private fun changePlayerSpeed(call: MethodCall, result: Result) {
+    val speed = call.argument<Double>("speed")
+    if (speed != null) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val playbackParams = PlaybackParams()
+        playbackParams.speed = speed.toFloat()
+        mAudioTrack?.playbackParams = playbackParams
+      }
+      result.success(true)
+    } else {
+      result.error(
+              SoundStreamErrors.FailedToWriteBuffer.name,
+              "Failed to change Player speed",
+              "'speed' is null"
+      )
+    }
+  }
+
   private fun seek(call: MethodCall, result: Result) {
     val seekTime = call.argument<Double>("seekTime")
     if (seekTime != null) {
