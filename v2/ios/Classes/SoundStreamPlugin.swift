@@ -398,6 +398,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mAudioEngine.attach(mPlayerNode)
         mAudioEngine.connect(mPlayerNode, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
         
+        
     }
     
     private func startPlayer(_ result: @escaping FlutterResult) {
@@ -459,14 +460,24 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func pushPlayerChunk(_ chunk: [UInt8], _ result: @escaping FlutterResult) {
         let buffer = bytesToAudioBuffer(chunk)
-      
+        mPlayerBuffer.append(contentsOf: chunk)
+        let chunkBufferLength = mPlayerBuffer.count
         mPlayerNode.scheduleBuffer(convertBufferFormat(
             buffer,
             from: mPlayerInputFormat,
             to: mPlayerOutputFormat
-        ));
+        ),completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+            if (chunkBufferLength < self.mPlayerBuffer.count)
+            {
+                // we had another chunk
+            }
+            else{
+                self.sendPlayerStatus(SoundStreamStatus.Stopped)
+            }
+            
+        };
         
-        mPlayerBuffer.append(contentsOf: chunk)
+        
         
         result(true)
     }
