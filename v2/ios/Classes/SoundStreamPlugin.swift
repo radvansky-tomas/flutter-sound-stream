@@ -46,6 +46,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var mPlayerBufferSize: AVAudioFrameCount = 8192
     private var mPlayerOutputFormat: AVAudioFormat!
     private var mPlayerInputFormat: AVAudioFormat!
+    private let speedControl = AVAudioUnitVarispeed()
     private var mPlayerBuffer:[UInt8] = []
     
     /** ======== Basic Plugin initialization ======== **/
@@ -88,6 +89,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             stopPlayer(result)
         case "writeChunk":
             writeChunk(call, result)
+        case "changePlayerSpeed":
+            changePlayerSpeed(call, result)
         case "seek":
             seek(call, result)
         case "checkCurrentTime":
@@ -396,7 +399,10 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
         
         mAudioEngine.attach(mPlayerNode)
-        mAudioEngine.connect(mPlayerNode, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
+        mAudioEngine.attach(speedControl)
+        
+        mAudioEngine.connect(mPlayerNode, to: speedControl, format: mPlayerOutputFormat)
+        mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
         
         
     }
@@ -420,6 +426,18 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func sendPlayerStatus(_ status: SoundStreamStatus) {
         sendEventMethod("playerStatus", status.rawValue)
+    }
+    
+    private func changePlayerSpeed(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+        guard let argsArr = call.arguments as? Dictionary<String,AnyObject>,
+              let speed = argsArr["speed"] as? Float
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.FailedToWriteBuffer.rawValue,
+                                             message:"Failed to change Player speed",
+                                             details: nil ))
+            return
+        }
+        speedControl.rate = speed
     }
     
     private func writeChunk(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {

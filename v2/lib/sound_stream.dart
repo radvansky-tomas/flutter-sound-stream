@@ -49,6 +49,10 @@ class SoundStream {
     return SoundStreamPlatform.instance.usePhoneSpeaker(value);
   }
 
+  Future<dynamic> changePlayerSpeed(double speed) {
+    return SoundStreamPlatform.instance.changePlayerSpeed(speed);
+  }
+
   Future<dynamic> seek(double seekTime) {
     return SoundStreamPlatform.instance.seek(seekTime);
   }

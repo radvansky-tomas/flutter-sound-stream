@@ -145,6 +145,13 @@ class _MyAppState extends State<MyApp> {
                   print(buffer.length);
                 },
               ),
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.speed),
+                onPressed: () async {
+                   await soundStream.changePlayerSpeed(2.0);
+                },
+              ),
             ],)
           ],
         ),
