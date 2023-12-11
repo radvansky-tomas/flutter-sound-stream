@@ -119,26 +119,33 @@ class _MyAppState extends State<MyApp> {
                 });
               },
             ),
-            IconButton(
-              iconSize: 96.0,
-              icon: Icon(Icons.lock_clock),
-              onPressed: () async {
-
-               final time =  await soundStream.checkCurrentTime();
-               print(time);
-
-              },
-            ),
-            IconButton(
-              iconSize: 96.0,
-              icon: Icon(Icons.skip_next),
-              onPressed: () async {
-
-               await soundStream.seek(1);
-
-
-              },
-            ),
+            Row(children: [
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.lock_clock),
+                onPressed: () async {
+                  final time =  await soundStream.checkCurrentTime();
+                  print(time);
+                },
+              ),
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.skip_next),
+                onPressed: () async {
+                  await soundStream.seek(1);
+                },
+              ),
+            ],),
+            Row(children: [
+              IconButton(
+                iconSize: 96.0,
+                icon: Icon(Icons.data_array),
+                onPressed: () async {
+                  final buffer =  await soundStream.getPlayerBuffer();
+                  print(buffer.length);
+                },
+              ),
+            ],)
           ],
         ),
       ),

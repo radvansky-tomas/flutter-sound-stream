@@ -33,6 +33,12 @@ class SoundStream {
     final double time = await SoundStreamPlatform.instance.checkCurrentTime();
     return time;
   }
+
+  Future<Uint8List> getPlayerBuffer()async{
+    final Uint8List buffer = await SoundStreamPlatform.instance.getPlayerBuffer();
+    return buffer;
+  }
+
   Stream<SoundStreamStatus> get playerStatus =>
       SoundStreamPlatform.instance.playerStatus;
 

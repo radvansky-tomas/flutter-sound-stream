@@ -92,6 +92,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             seek(call, result)
         case "checkCurrentTime":
             checkCurrentTime(result)
+        case "getPlayerBuffer":
+            getPlayerBuffer(result)
         default:
             print("Unrecognized method: \(call.method)")
             sendResult(result, FlutterMethodNotImplemented)
@@ -227,6 +229,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             return;
         }
      sendResult(result, 0)
+    }
+    
+    private func getPlayerBuffer(_ result: @escaping FlutterResult)  {
+        let channelData = FlutterStandardTypedData(bytes: NSData(bytes: mPlayerBuffer, length: mPlayerBuffer.count) as Data)
+        sendResult(result, channelData)
     }
     
     private func startRecorder() {

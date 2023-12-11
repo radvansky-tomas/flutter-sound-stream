@@ -91,6 +91,9 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
       methodChannel.invokeMethod("writeChunk", <String, dynamic>{"data": data});
 
   @override
+  Future<dynamic> getPlayerBuffer() => methodChannel.invokeMethod("getPlayerBuffer");
+
+  @override
   Future<dynamic> seek(double seekTime) =>
     methodChannel.invokeMethod("seek", <String, dynamic>{"seekTime": seekTime});
 

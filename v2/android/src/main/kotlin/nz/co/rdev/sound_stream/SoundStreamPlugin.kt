@@ -99,6 +99,7 @@ class SoundStreamPlugin :
         "initializePlayer" -> initializePlayer(call, result)
         "startPlayer" -> startPlayer(result)
         "stopPlayer" -> stopPlayer(result)
+        "getPlayerBuffer" -> getPlayerBuffer(call, result)
         "writeChunk" -> writeChunk(call, result)
         "seek" -> seek(call, result)
         "checkCurrentTime" -> checkCurrentTime(call, result)
@@ -374,6 +375,15 @@ class SoundStreamPlugin :
       // getTimestamp failed
       result.error("internal","getTimeStampFailed",null);
     }
+  }
+
+  private fun getPlayerBuffer(call: MethodCall, result: Result){
+    val flatArray = mPlayerBuffer.flatMap { it.toList() }
+
+    val byteBuffer = ByteBuffer.allocate(flatArray.size * 2)
+    byteBuffer.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(flatArray.toShortArray())
+
+    result.success(byteBuffer.array());
   }
   private fun seek(call: MethodCall, result: Result) {
     val seekTime = call.argument<Double>("seekTime")

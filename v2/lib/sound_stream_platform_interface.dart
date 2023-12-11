@@ -45,6 +45,10 @@ abstract class SoundStreamPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
+  Future<dynamic> getPlayerBuffer() {
+    throw UnimplementedError();
+  }
+
   Stream<SoundStreamStatus> get playerStatus =>
       Stream.value(SoundStreamStatus.Unset);
 
