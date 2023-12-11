@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.*
 import android.media.AudioRecord.OnRecordPositionUpdateListener
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -20,7 +22,8 @@ import io.flutter.plugin.common.PluginRegistry
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
-
+import java.util.Timer
+import kotlin.concurrent.timerTask
 
 enum class SoundStreamErrors {
   FailedToRecord,
@@ -72,7 +75,7 @@ class SoundStreamPlugin :
   private var mPlayerSampleRate = 16000 // 16Khz
   private var mPlayerBufferSize = 10240
   private var mPlayerBuffer = emptyArray<ShortArray>()
-
+  private var mPlayerTimer: Timer? = null
   private var mPlayerFormat: AudioFormat =
       AudioFormat.Builder()
           .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
@@ -311,8 +314,42 @@ class SoundStreamPlugin :
     mAudioManager = currentActivity?.getSystemService(Context.AUDIO_SERVICE) as AudioManager
   }
 
+  private fun startTimer() {
+    mPlayerTimer = Timer()
+
+    mPlayerTimer?.schedule(timerTask {
+      val timestamp = AudioTimestamp()
+      mAudioTrack?.getTimestamp(timestamp)
+
+      val framePosition = timestamp.framePosition.toInt()
+      val bufferFrames = mPlayerBuffer.sumBy { it.size }
+
+      if (framePosition >= bufferFrames) {
+        // AudioTrack has finished playing
+        println("AudioTrack has finished playing")
+        val handler = Handler(Looper.getMainLooper())
+
+        handler.postDelayed({
+          val delayedFrames = mPlayerBuffer.sumBy { it.size }
+          if (delayedFrames == bufferFrames) {
+            println("AudioTrack has finished playing")
+            sendPlayerStatus(SoundStreamStatus.Stopped)
+            stopTimer()
+          }
+        }, 500) //
+
+
+      }
+    }, 0, 500) // Run every second
+  }
+
+  private fun stopTimer() {
+    mPlayerTimer?.cancel()
+    mPlayerTimer = null
+  }
   private fun initializePlayer(call: MethodCall, result: Result) {
     initAudioManager()
+    stopTimer()
     mPlayerBuffer = emptyArray()
     mPlayerSampleRate = call.argument<Int>("sampleRate") ?: mPlayerSampleRate
     debugLogging = call.argument<Boolean>("showLogs") ?: false
@@ -468,6 +505,7 @@ class SoundStreamPlugin :
       }
 
       mAudioTrack!!.play()
+      startTimer()
       sendPlayerStatus(SoundStreamStatus.Playing)
       result.success(true)
     } catch (e: Exception) {
@@ -484,6 +522,7 @@ class SoundStreamPlugin :
       if (mAudioTrack?.state == AudioTrack.STATE_INITIALIZED) {
         mAudioTrack?.stop()
       }
+      stopTimer()
       sendPlayerStatus(SoundStreamStatus.Stopped)
       result.success(true)
     } catch (e: Exception) {
