@@ -91,6 +91,11 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
       methodChannel.invokeMethod("writeChunk", <String, dynamic>{"data": data});
 
   @override
+  Future<dynamic> seek(double seekTime) =>
+    methodChannel.invokeMethod("seek", <String, dynamic>{"seekTime": seekTime});
+
+
+  @override
   Stream<SoundStreamStatus> get playerStatus => _playerStatusController.stream;
 
   /// Stream's sink to receive PCM 16bit data to send to Player

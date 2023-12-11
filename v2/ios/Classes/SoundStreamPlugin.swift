@@ -46,6 +46,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var mPlayerBufferSize: AVAudioFrameCount = 8192
     private var mPlayerOutputFormat: AVAudioFormat!
     private var mPlayerInputFormat: AVAudioFormat!
+    private var mPlayerBuffer:[UInt8] = []
     
     /** ======== Basic Plugin initialization ======== **/
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -87,6 +88,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             stopPlayer(result)
         case "writeChunk":
             writeChunk(call, result)
+        case "seek":
+            seek(call, result)
         case "checkCurrentTime":
             checkCurrentTime(result)
         default:
@@ -95,14 +98,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
     }
     
-    private func checkCurrentTime(_ result: @escaping FlutterResult)  {
-        if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
-            sendResult(result, Double(Double(playerTime.sampleTime) / playerTime.sampleRate));
-            return;
-        }
-     sendResult(result, 0)
-    }
-    
+
     private func sendResult(_ result: @escaping FlutterResult, _ arguments: Any?) {
         DispatchQueue.main.async {
             result( arguments )
@@ -225,6 +221,14 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
     }
     
+    private func checkCurrentTime(_ result: @escaping FlutterResult)  {
+        if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
+            sendResult(result, Double(Double(playerTime.sampleTime) / playerTime.sampleRate));
+            return;
+        }
+     sendResult(result, 0)
+    }
+    
     private func startRecorder() {
         stopRecorder()
         let input = mAudioEngine.inputNode
@@ -294,6 +298,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate
         debugLogging = argsArr["showLogs"] as? Bool ?? debugLogging
         mPlayerInputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: mPlayerSampleRate, channels: 1, interleaved: true)
+        mPlayerBuffer = []
         sendPlayerStatus(SoundStreamStatus.Initialized)
     }
     
@@ -422,13 +427,40 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         pushPlayerChunk(byteData, result)
     }
     
+    private func seek(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+        guard let argsArr = call.arguments as? Dictionary<String,AnyObject>,
+              let seekTime = argsArr["seekTime"] as? Double
+        else {
+            sendResult(result, FlutterError( code: SoundStreamErrors.FailedToWriteBuffer.rawValue,
+                                             message:"Failed to seek Player buffer",
+                                             details: nil ))
+            return
+        }
+        
+        mPlayerNode.stop()
+
+        let timeToStart = AVAudioTime(sampleTime: Int64(seekTime * mPlayerSampleRate), atRate: mPlayerSampleRate)
+        let buffer = bytesToAudioBuffer(mPlayerBuffer)
+        mPlayerNode.scheduleBuffer(convertBufferFormat(
+            buffer,
+            from: mPlayerInputFormat,
+            to: mPlayerOutputFormat
+        ), at: timeToStart, options: [], completionHandler: nil)
+
+        mPlayerNode.play()
+    }
+    
     private func pushPlayerChunk(_ chunk: [UInt8], _ result: @escaping FlutterResult) {
         let buffer = bytesToAudioBuffer(chunk)
+      
         mPlayerNode.scheduleBuffer(convertBufferFormat(
             buffer,
             from: mPlayerInputFormat,
             to: mPlayerOutputFormat
         ));
+        
+        mPlayerBuffer.append(contentsOf: chunk)
+        
         result(true)
     }
     

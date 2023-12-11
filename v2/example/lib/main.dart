@@ -129,6 +129,16 @@ class _MyAppState extends State<MyApp> {
 
               },
             ),
+            IconButton(
+              iconSize: 96.0,
+              icon: Icon(Icons.skip_next),
+              onPressed: () async {
+
+               await soundStream.seek(1);
+
+
+              },
+            ),
           ],
         ),
       ),

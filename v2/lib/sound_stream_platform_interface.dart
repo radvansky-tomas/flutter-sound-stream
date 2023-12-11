@@ -58,6 +58,10 @@ abstract class SoundStreamPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
+  Future<dynamic> seek(double seekTime){
+    throw UnimplementedError();
+  }
+
   /// Recorder
   Future<dynamic> initializeRecorder(
       {int sampleRate = 16000, bool showLogs = false}) {

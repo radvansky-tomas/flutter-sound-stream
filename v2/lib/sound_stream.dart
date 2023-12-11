@@ -43,6 +43,10 @@ class SoundStream {
     return SoundStreamPlatform.instance.usePhoneSpeaker(value);
   }
 
+  Future<dynamic> seek(double seekTime) {
+    return SoundStreamPlatform.instance.seek(seekTime);
+  }
+
   /// Recorder
   Future<dynamic> initializeRecorder({
     int sampleRate = 16000,

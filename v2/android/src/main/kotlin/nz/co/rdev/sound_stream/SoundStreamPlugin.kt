@@ -71,6 +71,7 @@ class SoundStreamPlugin :
   private var mAudioManager: AudioManager? = null
   private var mPlayerSampleRate = 16000 // 16Khz
   private var mPlayerBufferSize = 10240
+  private var mPlayerBuffer = emptyArray<ShortArray>()
 
   private var mPlayerFormat: AudioFormat =
       AudioFormat.Builder()
@@ -87,6 +88,7 @@ class SoundStreamPlugin :
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
+
     try {
       when (call.method) {
         "hasPermission" -> hasPermission(result)
@@ -98,6 +100,7 @@ class SoundStreamPlugin :
         "startPlayer" -> startPlayer(result)
         "stopPlayer" -> stopPlayer(result)
         "writeChunk" -> writeChunk(call, result)
+        "seek" -> seek(call, result)
         "checkCurrentTime" -> checkCurrentTime(call, result)
         else -> result.notImplemented()
       }
@@ -309,6 +312,7 @@ class SoundStreamPlugin :
 
   private fun initializePlayer(call: MethodCall, result: Result) {
     initAudioManager()
+    mPlayerBuffer = emptyArray()
     mPlayerSampleRate = call.argument<Int>("sampleRate") ?: mPlayerSampleRate
     debugLogging = call.argument<Boolean>("showLogs") ?: false
     mPlayerFormat =
@@ -371,7 +375,49 @@ class SoundStreamPlugin :
       result.error("internal","getTimeStampFailed",null);
     }
   }
+  private fun seek(call: MethodCall, result: Result) {
+    val seekTime = call.argument<Double>("seekTime")
+    if (seekTime != null) {
+      val channels = 1
 
+      val offsetInShorts = (seekTime * mPlayerSampleRate * channels).toInt()
+
+      mAudioTrack?.pause()
+      mAudioTrack?.flush();
+      mAudioTrack!!.play()
+      var currentPosition = 0
+      mPlayerBuffer.forEach {
+
+        /// Seek position by writting to mAudioTrack
+        /// If current position is before offset, just skip
+        /// Then if is current shortArray entry, start from offsetInShorts
+        /// And then just continue feeding buffer
+
+        if (currentPosition + it.size < offsetInShorts) {
+        /// Skip
+        }
+        else if (currentPosition + it.size > offsetInShorts && currentPosition + it.size < offsetInShorts + it.size)
+        {
+          mAudioTrack?.write(it, offsetInShorts, it.size)
+        }
+        else{
+          mAudioTrack?.write(it, 0, it.size)
+        }
+
+        currentPosition += it.size
+        
+      }
+
+
+      result.success(true)
+    } else {
+      result.error(
+              SoundStreamErrors.FailedToWriteBuffer.name,
+              "Failed to seek Player ",
+              "'seekTime' is null"
+      )
+    }
+  }
   private fun writeChunk(call: MethodCall, result: Result) {
     val data = call.argument<ByteArray>("data")
     if (data != null) {
@@ -393,6 +439,7 @@ class SoundStreamPlugin :
       val shortChunk = shortBuffer.array()
 
       mAudioTrack?.write(shortChunk, 0, shortChunk.size)
+      mPlayerBuffer += shortChunk
       result.success(true)
     } catch (e: Exception) {
       result.error(
