@@ -188,18 +188,14 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func checkCurrentTime(_ result: @escaping FlutterResult)  {
         if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
-            sendResult(result, Double(Double(playerTime.sampleTime) / playerTime.sampleRate));
+            sendResult(result, Double(Double(playerTime.sampleTime) / Double(playerTime.sampleRate)));
             return;
         }
      sendResult(result, 0)
     }
     
     private func getDuration(_ result: @escaping FlutterResult)  {
-        if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime {
-            sendResult(result, Double( nodeTime.sampleRate));
-            return;
-        }
-     sendResult(result, 0)
+            sendResult(result, Double( Double(mPlayerBuffer.count) / Double(mPlayerSampleRate)));
     }
     
     private func getPlayerBuffer(_ result: @escaping FlutterResult)  {

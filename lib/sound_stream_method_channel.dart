@@ -103,8 +103,8 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
       .invokeMethod("usePhoneSpeaker", <String, dynamic>{"value": value});
 
   @override
-  Future<dynamic> checkCurrentTime() => methodChannel.invokeMethod("checkCurrentTime");
+  Future<double?> checkCurrentTime() => methodChannel.invokeMethod<double>("checkCurrentTime");
 
   @override
-  Future<dynamic> getDuration() => methodChannel.invokeMethod("getDuration");
+  Future<double?> getDuration() => methodChannel.invokeMethod<double>("getDuration");
 }

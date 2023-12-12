@@ -30,12 +30,12 @@ class SoundStream {
   }
 
   Future<double> checkCurrentTime()async{
-    final double time = await SoundStreamPlatform.instance.checkCurrentTime();
+    final double time = await SoundStreamPlatform.instance.checkCurrentTime() ?? 0.0;
     return time;
   }
 
   Future<double> getDuration()async{
-    final double time = await SoundStreamPlatform.instance.getDuration();
+    final double time = await SoundStreamPlatform.instance.getDuration() ?? 0.0;
     return time;
   }
 
