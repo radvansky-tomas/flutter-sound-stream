@@ -56,27 +56,4 @@ class SoundStream {
   Future<dynamic> seek(double seekTime) {
     return SoundStreamPlatform.instance.seek(seekTime);
   }
-
-  /// Recorder
-  Future<dynamic> initializeRecorder({
-    int sampleRate = 16000,
-    bool showLogs = false,
-  }) {
-    return SoundStreamPlatform.instance
-        .initializeRecorder(sampleRate: sampleRate, showLogs: showLogs);
-  }
-
-  Future<dynamic> startRecorder() {
-    return SoundStreamPlatform.instance.startRecorder();
-  }
-
-  Future<dynamic> stopRecorder() {
-    return SoundStreamPlatform.instance.stopRecorder();
-  }
-
-  Stream<SoundStreamStatus> get recorderStatus =>
-      SoundStreamPlatform.instance.recorderStatus;
-
-  Stream<Uint8List> get recorderAudioStream =>
-      SoundStreamPlatform.instance.recorderAudioStream;
 }

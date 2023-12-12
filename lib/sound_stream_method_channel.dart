@@ -125,34 +125,4 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
 
   final _recorderStatusController =
       StreamController<SoundStreamStatus>.broadcast();
-
-  /// Initialize Recorder with specified [sampleRate]
-  @override
-  Future<dynamic> initializeRecorder(
-          {int sampleRate = 16000, bool showLogs = false}) =>
-      methodChannel.invokeMethod<dynamic>("initializeRecorder", {
-        "sampleRate": sampleRate,
-        "showLogs": showLogs,
-      });
-
-  /// Start recording. Recorder will start pushing audio chunks (PCM 16bit data)
-  /// to audiostream as Uint8List
-  @override
-  Future<dynamic> startRecorder() =>
-      methodChannel.invokeMethod<dynamic>("startRecording");
-
-  /// Recorder will stop recording and sending audio chunks to the [audioStream].
-  @override
-  Future<dynamic> stopRecorder() =>
-      methodChannel.invokeMethod<dynamic>("stopRecording");
-
-  /// Current status of the [RecorderStream]
-  @override
-  Stream<SoundStreamStatus> get recorderStatus =>
-      _recorderStatusController.stream;
-
-  /// Stream of PCM 16bit data from Microphone
-  @override
-  Stream<Uint8List> get recorderAudioStream =>
-      _recorderAudioStreamController.stream;
 }

@@ -69,23 +69,4 @@ abstract class SoundStreamPlatform extends PlatformInterface {
   Future<dynamic> seek(double seekTime){
     throw UnimplementedError();
   }
-
-  /// Recorder
-  Future<dynamic> initializeRecorder(
-      {int sampleRate = 16000, bool showLogs = false}) {
-    throw UnimplementedError();
-  }
-
-  Future<dynamic> startRecorder() {
-    throw UnimplementedError();
-  }
-
-  Future<dynamic> stopRecorder() {
-    throw UnimplementedError();
-  }
-
-  Stream<SoundStreamStatus> get recorderStatus =>
-      Stream.value(SoundStreamStatus.Unset);
-
-  Stream<Uint8List> get recorderAudioStream => Stream.empty();
 }

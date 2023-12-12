@@ -27,17 +27,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private let mAudioEngine = AVAudioEngine()
     private var isUsingSpeaker: Bool = false
     
-    //========= Recorder's vars
-    private let mRecordBus = 0
-    private var mInputNode: AVAudioInputNode
-    private var mRecordSampleRate: Double = 16000 // 16Khz
-    private var mRecordBufferSize: AVAudioFrameCount = 8192
-    private var mRecordChannel = 0
-    private var mRecordSettings: [String:Int]!
-    private var mRecordFormat: AVAudioFormat!
-    private var mRecordMixer: AVAudioMixerNode!
-    private var isRecording: Bool = false
-    
     //========= Player's vars
     private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 44100   // 32Khz
     private let mPlayerBus = 0
@@ -59,8 +48,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     init( _ channel: FlutterMethodChannel, registrar: FlutterPluginRegistrar ) {
         self.channel = channel
         self.registrar = registrar
-        self.mInputNode = mAudioEngine.inputNode
-        self.mRecordMixer = AVAudioMixerNode()
         
         super.init()
         self.attachPlayer()
@@ -75,12 +62,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             sendResult(result, isUsingSpeaker)
         case "usePhoneSpeaker":
             usePhoneSpeaker(call, result)
-        case "initializeRecorder":
-            initializeRecorder(call, result)
-        case "startRecording":
-            startRecording(result)
-        case "stopRecording":
-            stopRecording(result)
         case "initializePlayer":
             initializePlayer(call, result)
         case "startPlayer":
@@ -202,29 +183,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         invokeFlutter("platformEvent", eventData)
     }
     
-    private func initializeRecorder(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
-        guard let argsArr = call.arguments as? Dictionary<String,AnyObject>
-        else {
-            sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
-                                             message:"Incorrect parameters",
-                                             details: nil ))
-            return
-        }
-        mRecordSampleRate = argsArr["sampleRate"] as? Double ?? mRecordSampleRate
-        debugLogging = argsArr["showLogs"] as? Bool ?? debugLogging
-        mRecordFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: mRecordSampleRate, channels: 1, interleaved: true)
-        
-        checkAndRequestPermission { isGranted in
-            if isGranted {
-                self.sendRecorderStatus(SoundStreamStatus.Initialized)
-                self.sendResult(result, true)
-            } else {
-                self.sendResult(result, FlutterError( code: SoundStreamErrors.Unknown.rawValue,
-                                                      message:"Incorrect parameters",
-                                                      details: nil ))
-            }
-        }
-    }
     
     private func checkCurrentTime(_ result: @escaping FlutterResult)  {
         if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
@@ -237,63 +195,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private func getPlayerBuffer(_ result: @escaping FlutterResult)  {
         let channelData = FlutterStandardTypedData(bytes: NSData(bytes: mPlayerBuffer, length: mPlayerBuffer.count) as Data)
         sendResult(result, channelData)
-    }
-    
-    private func startRecorder() {
-        stopRecorder()
-        let input = mAudioEngine.inputNode
-        let inputFormat = input.inputFormat(forBus: mRecordBus)
-        let converter = AVAudioConverter(from: inputFormat, to: mRecordFormat!)!
-        let ratio: Float = Float(inputFormat.sampleRate)/Float(mRecordFormat.sampleRate)
-        
-        input.installTap(onBus: mRecordBus, bufferSize: mRecordBufferSize, format: inputFormat) { (buffer, time) -> Void in
-            let inputCallback: AVAudioConverterInputBlock = { inNumPackets, outStatus in
-                outStatus.pointee = .haveData
-                return buffer
-            }
-            
-            self.isRecording = true
-            
-            let convertedBuffer = AVAudioPCMBuffer(pcmFormat: self.mRecordFormat!, frameCapacity: UInt32(Float(buffer.frameCapacity) / ratio))!
-            
-            var error: NSError?
-            let status = converter.convert(to: convertedBuffer, error: &error, withInputFrom: inputCallback)
-            assert(status != .error)
-            
-            if (self.mRecordFormat?.commonFormat == AVAudioCommonFormat.pcmFormatInt16) {
-                let values = self.audioBufferToBytes(convertedBuffer)
-                self.sendMicData(values)
-            }
-        }
-    }
-    
-    
-    private func stopRecorder() {
-        mAudioEngine.inputNode.removeTap(onBus: mRecordBus)
-        isRecording = false
-    }
-    
-    private func startRecording(_ result: @escaping FlutterResult) {
-        startEngine()
-        startRecorder()
-        sendRecorderStatus(SoundStreamStatus.Playing)
-        result(true)
-    }
-    
-    private func stopRecording(_ result: @escaping FlutterResult) {
-        mAudioEngine.inputNode.removeTap(onBus: mRecordBus)
-        stopEngine()
-        sendRecorderStatus(SoundStreamStatus.Stopped)
-        result(true)
-    }
-    
-    private func sendMicData(_ data: [UInt8]) {
-        let channelData = FlutterStandardTypedData(bytes: NSData(bytes: data, length: data.count) as Data)
-        sendEventMethod("dataPeriod", channelData)
-    }
-    
-    private func sendRecorderStatus(_ status: SoundStreamStatus) {
-        sendEventMethod("recorderStatus", status.rawValue)
     }
     
     private func initializePlayer(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -331,11 +232,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         if mPlayerNode.isPlaying {
             mPlayerNode.stop()
             sendPlayerStatus(SoundStreamStatus.Stopped)
-        }
-        
-        if isRecording {
-            stopRecorder()
-            sendRecorderStatus(SoundStreamStatus.Stopped)
         }
         
         let avAudioSession = AVAudioSession.sharedInstance()
