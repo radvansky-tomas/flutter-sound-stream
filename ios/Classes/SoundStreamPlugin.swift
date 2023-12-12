@@ -28,7 +28,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var isUsingSpeaker: Bool = false
     
     //========= Player's vars
-    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 32000
+    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 44100 
     private let mPlayerBus = 0
     private let mPlayerNode = AVAudioPlayerNode()
     private var mPlayerSampleRate: Double = 16000
