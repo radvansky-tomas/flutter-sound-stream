@@ -42,20 +42,6 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlugin() async {
-    _recorderStatus = soundStream.recorderStatus.listen((status) {
-      if (mounted)
-        setState(() {
-          _isRecording = status == SoundStreamStatus.Playing;
-        });
-    });
-
-    _audioStream = soundStream.recorderAudioStream.listen((data) {
-      if (_isPlaying) {
-        soundStream.writeChunk(data);
-      } else {
-        _micChunks.add(data);
-      }
-    });
 
     _playerStatus = soundStream.playerStatus.listen((status) {
       if (mounted)
@@ -65,7 +51,6 @@ class _MyAppState extends State<MyApp> {
     });
 
     await Future.wait([
-      soundStream.initializeRecorder(),
       soundStream.initializePlayer(),
     ]);
     // _player.usePhoneSpeaker(_useSpeaker);
@@ -95,13 +80,7 @@ class _MyAppState extends State<MyApp> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                IconButton(
-                  iconSize: 96.0,
-                  icon: Icon(_isRecording ? Icons.mic_off : Icons.mic),
-                  onPressed: _isRecording
-                      ? soundStream.stopRecorder
-                      : soundStream.startRecorder,
-                ),
+               
                 IconButton(
                   iconSize: 96.0,
                   icon: Icon(Icons.music_note),

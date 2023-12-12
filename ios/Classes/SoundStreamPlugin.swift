@@ -369,14 +369,17 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mPlayerNode.stop()
 
         let timeToStart = AVAudioTime(sampleTime: Int64(seekTime * mPlayerSampleRate), atRate: mPlayerSampleRate)
-        let buffer = try! bytesToAudioBuffer(mPlayerBuffer)
-        mPlayerNode.scheduleBuffer(convertBufferFormat(
-            buffer,
-            from: mPlayerInputFormat,
-            to: mPlayerOutputFormat
-        ), at: timeToStart, options: [], completionHandler: nil)
-
-        mPlayerNode.play()
+        let buffer = try? bytesToAudioBuffer(mPlayerBuffer)
+        if (buffer != nil)
+        {
+            mPlayerNode.scheduleBuffer(convertBufferFormat(
+                buffer!,
+                from: mPlayerInputFormat,
+                to: mPlayerOutputFormat
+            ), at: timeToStart, options: [], completionHandler: nil)
+            
+            mPlayerNode.play()
+        }
     }
     
     private func pushPlayerChunk(_ chunk: [UInt8], _ result: @escaping FlutterResult) {
@@ -396,8 +399,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             }
             
         };
-        
-        
         
         result(true)
     }
@@ -434,8 +435,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         return audioByteArray
     }
+    var tmpData = Data()
     
-    private func bytesToAudioBuffer(_ buf: [UInt8]) throws -> AVAudioPCMBuffer {
+    private func bytesToAudioBuffer(_ buf: [UInt8]) throws -> AVAudioPCMBuffer? {
         // Create a temporary file to hold the MP3 data
         let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString).appendingPathExtension("mp3")
    
@@ -446,26 +448,37 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         } else if buf.count >= 4 {
             mp3Header = Array(buf[0..<4])
         }
+        print(tmpData.count)
+        var cache = Int(mPlayerSampleRate) * 2
+        if (tmpData.count > cache)
+        {
+            try tmpData.write(to: tempURL)
+
+            // Open the MP3 file
+            guard let audioFile = try? AVAudioFile(forReading: tempURL) else {
+                throw NSError(domain: "Error opening MP3 file", code: 1, userInfo: nil)
+            }
+
+            // Create a buffer in PCM format
+            guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerOutputFormat!, frameCapacity: UInt32(audioFile.length)) else {
+                throw NSError(domain: "Error creating PCM buffer", code: 2, userInfo: nil)
+            }
+
+            // Read the entire MP3 file into the buffer
+            try audioFile.read(into: audioBuffer)
+
+            // Delete the temporary file
+            try FileManager.default.removeItem(at: tempURL)
+            tmpData = data
+            return audioBuffer
+        }
+        else{
+            tmpData = tmpData + data;
+    
+            return nil
+        }
         
-        try data.write(to: tempURL)
-
-        // Open the MP3 file
-        guard let audioFile = try? AVAudioFile(forReading: tempURL) else {
-            throw NSError(domain: "Error opening MP3 file", code: 1, userInfo: nil)
-        }
-
-        // Create a buffer in PCM format
-        guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerOutputFormat!, frameCapacity: UInt32(audioFile.length)) else {
-            throw NSError(domain: "Error creating PCM buffer", code: 2, userInfo: nil)
-        }
-
-        // Read the entire MP3 file into the buffer
-        try audioFile.read(into: audioBuffer)
-
-        // Delete the temporary file
-        try FileManager.default.removeItem(at: tempURL)
-
-        return audioBuffer
+       
     }
 }
 
