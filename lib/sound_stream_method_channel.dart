@@ -40,17 +40,6 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
           orElse: () => SoundStreamStatus.Unset,
         ));
         break;
-      case "dataPeriod":
-        final Uint8List audioData = Uint8List.fromList(event["data"]);
-        if (audioData.isNotEmpty) _recorderAudioStreamController.add(audioData);
-        break;
-      case "recorderStatus":
-        final String status = event["data"] ?? "Unset";
-        _recorderStatusController.add(SoundStreamStatus.values.firstWhere(
-          (value) => enumToString(value) == status,
-          orElse: () => SoundStreamStatus.Unset,
-        ));
-        break;
     }
   }
 
@@ -115,14 +104,7 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
 
   @override
   Future<dynamic> checkCurrentTime() => methodChannel.invokeMethod("checkCurrentTime");
-  /// Recorder
-  ///
-  ///
-  // _recorderStatusController.add(SoundStreamStatus.Unset);
-  // _audioStreamController.add(Uint8List(0));
-  final _recorderAudioStreamController =
-      StreamController<Uint8List>.broadcast();
 
-  final _recorderStatusController =
-      StreamController<SoundStreamStatus>.broadcast();
+  @override
+  Future<dynamic> getDuration() => methodChannel.invokeMethod("getDuration");
 }

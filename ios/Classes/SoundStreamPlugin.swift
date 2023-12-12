@@ -76,6 +76,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             seek(call, result)
         case "checkCurrentTime":
             checkCurrentTime(result)
+        case "getDuration":
+            getDuration(result)
         case "getPlayerBuffer":
             getPlayerBuffer(result)
         default:
@@ -187,6 +189,14 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private func checkCurrentTime(_ result: @escaping FlutterResult)  {
         if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime, let playerTime: AVAudioTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
             sendResult(result, Double(Double(playerTime.sampleTime) / playerTime.sampleRate));
+            return;
+        }
+     sendResult(result, 0)
+    }
+    
+    private func getDuration(_ result: @escaping FlutterResult)  {
+        if let nodeTime: AVAudioTime = mPlayerNode.lastRenderTime {
+            sendResult(result, Double( nodeTime.sampleRate));
             return;
         }
      sendResult(result, 0)

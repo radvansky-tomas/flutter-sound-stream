@@ -66,6 +66,10 @@ abstract class SoundStreamPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
+  Future<dynamic> getDuration(){
+    throw UnimplementedError();
+  }
+
   Future<dynamic> seek(double seekTime){
     throw UnimplementedError();
   }
