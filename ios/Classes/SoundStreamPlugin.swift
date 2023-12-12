@@ -39,15 +39,15 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var isRecording: Bool = false
     
     //========= Player's vars
-    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 32000   // 32Khz
+    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 44100   // 32Khz
     private let mPlayerBus = 0
     private let mPlayerNode = AVAudioPlayerNode()
-    private var mPlayerSampleRate: Double = 16000 // 16Khz
-    private var mPlayerBufferSize: AVAudioFrameCount = 8192
+    private var mPlayerSampleRate: Double = 44100 // 44Khz
     private var mPlayerOutputFormat: AVAudioFormat!
     private var mPlayerInputFormat: AVAudioFormat!
     private let speedControl = AVAudioUnitVarispeed()
     private var mPlayerBuffer:[UInt8] = []
+    private var mp3Header:[UInt8] = []
     
     /** ======== Basic Plugin initialization ======== **/
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -307,9 +307,10 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate
         debugLogging = argsArr["showLogs"] as? Bool ?? debugLogging
-        mPlayerInputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: mPlayerSampleRate, channels: 1, interleaved: true)
+        mPlayerInputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: mPlayerSampleRate, channels: 1, interleaved: true)
         mPlayerBuffer = []
         sendPlayerStatus(SoundStreamStatus.Initialized)
+        sendResult(result, true)
     }
     
     private func usePhoneSpeaker(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
@@ -466,7 +467,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mPlayerNode.stop()
 
         let timeToStart = AVAudioTime(sampleTime: Int64(seekTime * mPlayerSampleRate), atRate: mPlayerSampleRate)
-        let buffer = bytesToAudioBuffer(mPlayerBuffer)
+        let buffer = try! bytesToAudioBuffer(mPlayerBuffer)
         mPlayerNode.scheduleBuffer(convertBufferFormat(
             buffer,
             from: mPlayerInputFormat,
@@ -477,14 +478,13 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func pushPlayerChunk(_ chunk: [UInt8], _ result: @escaping FlutterResult) {
-        let buffer = bytesToAudioBuffer(chunk)
+        guard let buffer = try? bytesToAudioBuffer(chunk) else {
+            result(true);
+            return
+        }
         mPlayerBuffer.append(contentsOf: chunk)
         let chunkBufferLength = mPlayerBuffer.count
-        mPlayerNode.scheduleBuffer(convertBufferFormat(
-            buffer,
-            from: mPlayerInputFormat,
-            to: mPlayerOutputFormat
-        ),completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+        mPlayerNode.scheduleBuffer(buffer,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
             if (chunkBufferLength < self.mPlayerBuffer.count)
             {
                 // we had another chunk
@@ -533,21 +533,37 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         return audioByteArray
     }
     
-    private func bytesToAudioBuffer(_ buf: [UInt8]) -> AVAudioPCMBuffer {
-        let frameLength = UInt32(buf.count) / mPlayerInputFormat.streamDescription.pointee.mBytesPerFrame
-        
-        let audioBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerInputFormat, frameCapacity: frameLength)!
-        audioBuffer.frameLength = frameLength
-        
-        let dstLeft = audioBuffer.int16ChannelData![0]
-        
-        buf.withUnsafeBufferPointer {
-            let src = UnsafeRawPointer($0.baseAddress!).bindMemory(to: Int16.self, capacity: Int(frameLength))
-            dstLeft.initialize(from: src, count: Int(frameLength))
+    private func bytesToAudioBuffer(_ buf: [UInt8]) throws -> AVAudioPCMBuffer {
+        // Create a temporary file to hold the MP3 data
+        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString).appendingPathExtension("mp3")
+   
+        var data = Data(buf)
+          
+        if !mp3Header.isEmpty {
+            data = Data(mp3Header) + data
+        } else if buf.count >= 4 {
+            mp3Header = Array(buf[0..<4])
         }
         
+        try data.write(to: tempURL)
+
+        // Open the MP3 file
+        guard let audioFile = try? AVAudioFile(forReading: tempURL) else {
+            throw NSError(domain: "Error opening MP3 file", code: 1, userInfo: nil)
+        }
+
+        // Create a buffer in PCM format
+        guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerOutputFormat!, frameCapacity: UInt32(audioFile.length)) else {
+            throw NSError(domain: "Error creating PCM buffer", code: 2, userInfo: nil)
+        }
+
+        // Read the entire MP3 file into the buffer
+        try audioFile.read(into: audioBuffer)
+
+        // Delete the temporary file
+        try FileManager.default.removeItem(at: tempURL)
+
         return audioBuffer
     }
-    
 }
 
