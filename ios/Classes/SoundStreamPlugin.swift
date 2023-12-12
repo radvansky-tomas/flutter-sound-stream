@@ -28,7 +28,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var isUsingSpeaker: Bool = false
     
     //========= Player's vars
-    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 16000
+    private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 32000
     private let mPlayerBus = 0
     private let mPlayerNode = AVAudioPlayerNode()
     private var mPlayerSampleRate: Double = 16000
@@ -299,7 +299,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             ])
         try! session.setActive(true)
         
-        mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
+        mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
         
         mAudioEngine.attach(mPlayerNode)
         mAudioEngine.attach(speedControl)
@@ -389,7 +389,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
         mPlayerBuffer.append(contentsOf: chunk)
         let chunkBufferLength = mPlayerBuffer.count
-        mPlayerNode.scheduleBuffer(buffer,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+        mPlayerNode.scheduleBuffer(convertBufferFormat(
+            buffer,
+            from: mPlayerInputFormat,
+            to: mPlayerOutputFormat
+        ),completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
             if (chunkBufferLength < self.mPlayerBuffer.count)
             {
                 // we had another chunk
@@ -449,7 +453,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             mp3Header = Array(buf[0..<4])
         }
         print(tmpData.count)
-        var cache = Int(mPlayerSampleRate) * 2
+        let cache = Int(mPlayerSampleRate) * 2
         if (tmpData.count > cache)
         {
             try tmpData.write(to: tempURL)
