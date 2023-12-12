@@ -47,9 +47,6 @@ class SoundStream {
   Stream<SoundStreamStatus> get playerStatus =>
       SoundStreamPlatform.instance.playerStatus;
 
-  StreamSink<Uint8List> get playerAudioStream =>
-      SoundStreamPlatform.instance.playerAudioStream;
-
   Future<dynamic> usePhoneSpeaker(bool value) {
     return SoundStreamPlatform.instance.usePhoneSpeaker(value);
   }
