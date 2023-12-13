@@ -2,6 +2,7 @@ enum SoundStreamStatus {
   Unset,
   Initialized,
   Playing,
+  Paused,
   Stopped,
 }
 
