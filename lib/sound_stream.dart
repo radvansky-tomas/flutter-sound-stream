@@ -12,9 +12,15 @@ class SoundStream {
   Future<dynamic> initializePlayer({
     int sampleRate = 16000,
     bool showLogs = false,
+    String? title,
+    String? artist,
   }) {
-    return SoundStreamPlatform.instance
-        .initializePlayer(sampleRate: sampleRate, showLogs: showLogs);
+    return SoundStreamPlatform.instance.initializePlayer(
+      sampleRate: sampleRate,
+      showLogs: showLogs,
+      title: title,
+      artist: artist,
+    );
   }
 
   Future<dynamic> startPlayer() {

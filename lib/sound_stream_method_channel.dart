@@ -58,10 +58,12 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
   /// Initialize Player with specified [sampleRate]
   @override
   Future<dynamic> initializePlayer(
-          {int sampleRate = 16000, bool showLogs = false}) =>
+          {int sampleRate = 16000, bool showLogs = false,String? title, String? artist,}) =>
       methodChannel.invokeMethod("initializePlayer", {
         "sampleRate": sampleRate,
         "showLogs": showLogs,
+        "title": title,
+        "artist": artist,
       });
 
   /// Player will start receiving audio chunks (PCM 16bit data)
