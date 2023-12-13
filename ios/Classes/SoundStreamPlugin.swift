@@ -43,6 +43,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var lastCurrentTime:Double = 0.0
     private var lastDuration:Double = 0.0
     private var nowPlayingInfo = [String : Any]()
+    private var title:String = "";
+    private var artist:String = "";
     
     /** ======== Basic Plugin initialization ======== **/
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -229,9 +231,15 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     func updateNowPlayingInfo(title: String, artist: String, duration: TimeInterval, elapsedTime: TimeInterval) {
         let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
         
+        let image = UIImage(named: "AppIcon")!
+        let artwork = MPMediaItemArtwork.init(boundsSize: image.size, requestHandler: { (size) -> UIImage in
+                return image
+        })
+        
         nowPlayingInfo[MPMediaItemPropertyTitle] = title
         nowPlayingInfo[MPMediaItemPropertyArtist] = artist
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
+        nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsedTime
         
         nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
@@ -305,7 +313,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         {
             // Fake previous time, as whilst paused, time is 0
             sendResult(result, lastCurrentTime)
-            updateNowPlayingInfo(title: "Sample Title", artist: "Sample Artist", duration: lastDuration, elapsedTime:lastCurrentTime)
             return
         }
         
@@ -330,7 +337,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             lastDuration = 0
             sendResult(result, Double(0.0));
         }
-        updateNowPlayingInfo(title: "Sample Title", artist: "Sample Artist", duration: lastDuration, elapsedTime:lastCurrentTime)
+        updateNowPlayingInfo(title: title, artist: artist, duration: lastDuration, elapsedTime:lastCurrentTime)
     }
     
     private func getPlayerBuffer(_ result: @escaping FlutterResult)  {
@@ -419,7 +426,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     private func startPlayer(_ result: @escaping FlutterResult) {
        startPlayerInternal()
-        result(true)
+       result(true)
     }
     
     private func stopPlayer(_ result: @escaping FlutterResult) {
