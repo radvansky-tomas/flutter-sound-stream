@@ -73,6 +73,10 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
   @override
   Future<dynamic> stopPlayer() => methodChannel.invokeMethod("stopPlayer");
 
+  /// Player will pause playback.
+  @override
+  Future<dynamic> pausePlayer() => methodChannel.invokeMethod("pausePlayer");
+
   /// Push audio [data] (PCM 16bit data) to player buffer as Uint8List
   /// to play audio. Chunks will be queued/scheduled to play sequentially
   @override

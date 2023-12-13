@@ -25,22 +25,27 @@ class SoundStream {
     return SoundStreamPlatform.instance.stopPlayer();
   }
 
+  Future<dynamic> pausePlayer() {
+    return SoundStreamPlatform.instance.pausePlayer();
+  }
+
   Future<dynamic> writeChunk(Uint8List data) {
     return SoundStreamPlatform.instance.writeChunk(data);
   }
 
-  Future<double> checkCurrentTime()async{
-    final double time = await SoundStreamPlatform.instance.checkCurrentTime() ?? 0.0;
-    return time;
+  Future<double> checkCurrentTime() async {
+    final time = await SoundStreamPlatform.instance.checkCurrentTime() ?? 0.0;
+    return time < 0.0 ? 0.0 : time;
   }
 
-  Future<double> getDuration()async{
-    final double time = await SoundStreamPlatform.instance.getDuration() ?? 0.0;
-    return time;
+  Future<double> getDuration() async {
+    final time = await SoundStreamPlatform.instance.getDuration() ?? 0.0;
+    return time < 0.0 ? 0.0 : time;
   }
 
-  Future<Uint8List> getPlayerBuffer()async{
-    final Uint8List buffer = await SoundStreamPlatform.instance.getPlayerBuffer();
+  Future<Uint8List> getPlayerBuffer() async {
+    final Uint8List buffer =
+        await SoundStreamPlatform.instance.getPlayerBuffer();
     return buffer;
   }
 

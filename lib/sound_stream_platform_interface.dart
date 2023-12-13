@@ -41,6 +41,10 @@ abstract class SoundStreamPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
+  Future<dynamic> pausePlayer() {
+    throw UnimplementedError();
+  }
+
   Future<dynamic> writeChunk(Uint8List data) {
     throw UnimplementedError();
   }
