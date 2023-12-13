@@ -204,6 +204,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         {
             // Fake previous time, as whilst paused, time is 0
             sendResult(result, lastCurrentTime)
+            return
         }
         
         if let nodeTime = mPlayerNode.lastRenderTime, let playerTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
