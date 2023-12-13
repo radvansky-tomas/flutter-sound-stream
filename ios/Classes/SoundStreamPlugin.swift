@@ -41,7 +41,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     // Add a property to store the start frame of the current segment
     private var startFrameOfCurrentSegment: AVAudioFramePosition = 0
     private var lastCurrentTime:Double = 0.0
-    
+    private var lastDuration:Double = 0.0
+    private var nowPlayingInfo = [String : Any]()
     
     /** ======== Basic Plugin initialization ======== **/
     public static func register(with registrar: FlutterPluginRegistrar) {
@@ -108,9 +109,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         startEngine()
         
         let avAudioSession = AVAudioSession.sharedInstance()
-        var options: AVAudioSession.CategoryOptions = [AVAudioSession.CategoryOptions.allowBluetooth, AVAudioSession.CategoryOptions.mixWithOthers]
-        options.insert(AVAudioSession.CategoryOptions.allowBluetoothA2DP)
-        try? avAudioSession.setCategory(AVAudioSession.Category.playAndRecord, options: options)
+        var options: AVAudioSession.CategoryOptions = [AVAudioSession.CategoryOptions.allowBluetooth, AVAudioSession.CategoryOptions.mixWithOthers,AVAudioSession.CategoryOptions.allowBluetoothA2DP]
+      
+        try? avAudioSession.setCategory(AVAudioSession.Category.playback, options: options)
         try? avAudioSession.setMode(AVAudioSession.Mode.default)
         
         setUsePhoneSpeaker(false)
@@ -149,17 +150,117 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mAudioEngine.connect(mPlayerNode, to: speedControl, format: mPlayerOutputFormat)
         mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
+        
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        setupRemoteTransportControls()
+        
     }
+    
+    func setupRemoteTransportControls() {
+        
+        // Get the shared MPRemoteCommandCenter
+        let commandCenter = MPRemoteCommandCenter.shared()
+        
+        // Add handler for Play Command
+        commandCenter.playCommand.addTarget { [unowned self] event in
+        startPlayerInternal()
+            return .success
+            
+            // return .commandFailed
+        }
+        
+        // Add handler for Pause Command
+        commandCenter.pauseCommand.addTarget { [unowned self] event in
+            pausePlayerInternal()
+            return .success
+            
+            // return .commandFailed
+        }
+        commandCenter.skipBackwardCommand.addTarget{ [unowned self] event in
+            
+            return .success
+            
+            // return .commandFailed
+        }
+        commandCenter.skipForwardCommand.addTarget{ [unowned self] event in
+            
+            return .success
+            
+            //return .commandFailed
+        }
+    }
+    
+    private func startPlayerInternal() {
+        startEngine()
+        if !mPlayerNode.isPlaying {
+            if (playerStatus == SoundStreamStatus.Paused)
+            {
+                ///Skip
+            }
+            else if (playerStatus == SoundStreamStatus.Stopped && mPlayerBuffer != nil && Double(mPlayerBuffer!.frameLength) > PLAYER_OUTPUT_SAMPLE_RATE * 4){
+                /// Start over
+                let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(0), to: nil)
+                let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
+                startFrameOfCurrentSegment = AVAudioFramePosition(0)
+                mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+                    if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
+                    {
+                        // we had another chunk
+                    }
+                    else{
+                        self.sendPlayerStatus(SoundStreamStatus.Stopped)
+                    }
+                    
+                };
+            }
+            mPlayerNode.play()
+        }
+        sendPlayerStatus(SoundStreamStatus.Playing)
+    }
+    
+    private func pausePlayerInternal() {
+        if mPlayerNode.isPlaying {
+            mPlayerNode.pause()
+        }
+        sendPlayerStatus(SoundStreamStatus.Paused)
+    }
+    
     
     func updateNowPlayingInfo(title: String, artist: String, duration: TimeInterval, elapsedTime: TimeInterval) {
         let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
-
-        nowPlayingInfoCenter.nowPlayingInfo = [
-            MPMediaItemPropertyTitle: title,
-            MPMediaItemPropertyArtist: artist,
-            MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime
-        ]
+        
+        nowPlayingInfo[MPMediaItemPropertyTitle] = title
+        nowPlayingInfo[MPMediaItemPropertyArtist] = artist
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsedTime
+        
+        nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
+        if #available(iOS 13.0, *) {
+            switch (playerStatus)
+            {
+            case SoundStreamStatus.Playing:
+                
+                nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.playing
+                
+                break
+            case SoundStreamStatus.Paused:
+                nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.paused
+                break
+            case SoundStreamStatus.Stopped:
+                nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.stopped
+                break
+            case SoundStreamStatus.Initialized:
+                nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.stopped
+                break
+            case SoundStreamStatus.Unset:
+                nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.unknown
+                break
+            }
+        } else {
+            // Fallback on earlier versions
+        }
+        
+        
     }
     
     private func sendEventMethod(_ name: String, _ data: Any) {
@@ -188,7 +289,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         {
             mPlayerNode.stop()
         }
-       
+        
         mPlayerBuffer = nil
         mp3Header = nil
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate
@@ -204,29 +305,32 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         {
             // Fake previous time, as whilst paused, time is 0
             sendResult(result, lastCurrentTime)
+            updateNowPlayingInfo(title: "Sample Title", artist: "Sample Artist", duration: lastDuration, elapsedTime:lastCurrentTime)
             return
         }
         
         if let nodeTime = mPlayerNode.lastRenderTime, let playerTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
-                let currentTime = (Double(startFrameOfCurrentSegment) + Double(playerTime.sampleTime)) / PLAYER_OUTPUT_SAMPLE_RATE
-                lastCurrentTime = currentTime
-                sendResult(result, currentTime)
-            } else {
-                sendResult(result, Double(0.0))
-            }
+            let currentTime = (Double(startFrameOfCurrentSegment) + Double(playerTime.sampleTime)) / PLAYER_OUTPUT_SAMPLE_RATE
+            lastCurrentTime = currentTime
+            sendResult(result, currentTime)
+        } else {
+            sendResult(result, Double(0.0))
+        }
     }
     
     private func getDuration(_ result: @escaping FlutterResult)  {
         if (mPlayerBuffer != nil)
         {
             let duration = Double(Double(mPlayerBuffer!.frameLength) / Double(mPlayerSampleRate))
-            
+            lastDuration = duration
             sendResult(result, duration);
         }
         else
         {
+            lastDuration = 0
             sendResult(result, Double(0.0));
         }
+        updateNowPlayingInfo(title: "Sample Title", artist: "Sample Artist", duration: lastDuration, elapsedTime:lastCurrentTime)
     }
     
     private func getPlayerBuffer(_ result: @escaping FlutterResult)  {
@@ -314,31 +418,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func startPlayer(_ result: @escaping FlutterResult) {
-        startEngine()
-        if !mPlayerNode.isPlaying {
-            if (playerStatus == SoundStreamStatus.Paused)
-            {
-               ///Skip
-            }
-            else if (playerStatus == SoundStreamStatus.Stopped && mPlayerBuffer != nil && Double(mPlayerBuffer!.frameLength) > PLAYER_OUTPUT_SAMPLE_RATE * 4){
-                /// Start over
-                let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(0), to: nil)
-                let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
-                startFrameOfCurrentSegment = AVAudioFramePosition(0)
-                mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                    if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
-                    {
-                        // we had another chunk
-                    }
-                    else{
-                        self.sendPlayerStatus(SoundStreamStatus.Stopped)
-                    }
-                    
-                };
-            }
-            mPlayerNode.play()
-        }
-        sendPlayerStatus(SoundStreamStatus.Playing)
+       startPlayerInternal()
         result(true)
     }
     
@@ -351,10 +431,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func pausePlayer(_ result: @escaping FlutterResult) {
-        if mPlayerNode.isPlaying {
-            mPlayerNode.pause()
-        }
-        sendPlayerStatus(SoundStreamStatus.Paused)
+        pausePlayerInternal()
         result(true)
     }
     
@@ -441,19 +518,19 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     func joinBuffers(buffer1: AVAudioPCMBuffer, buffer2: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
         let frames = buffer1.frameLength + buffer2.frameLength
         guard let newBuffer = AVAudioPCMBuffer(pcmFormat: buffer1.format, frameCapacity: frames) else { return nil }
-
+        
         if let buffer1Data = buffer1.floatChannelData, let newBufferData = newBuffer.floatChannelData {
             for channel in 0..<buffer1.format.channelCount {
                 memcpy(newBufferData[Int(channel)], buffer1Data[Int(channel)], Int(buffer1.frameLength * buffer1.format.streamDescription.pointee.mBytesPerFrame))
             }
         }
-
+        
         if let buffer2Data = buffer2.floatChannelData, let newBufferData = newBuffer.floatChannelData {
             for channel in 0..<buffer2.format.channelCount {
                 memcpy(newBufferData[Int(channel)] + Int(buffer1.frameLength), buffer2Data[Int(channel)], Int(buffer2.frameLength * buffer2.format.streamDescription.pointee.mBytesPerFrame))
             }
         }
-
+        
         newBuffer.frameLength = frames
         return newBuffer
     }
@@ -502,7 +579,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         return pcmBuffer
     }
     
-
+    
     private func bytesToAudioBuffer(_ buf: [UInt8]) throws -> AVAudioPCMBuffer? {
         let frameLength = UInt32(buf.count) / mPlayerInputFormat.streamDescription.pointee.mBytesPerFrame
         
