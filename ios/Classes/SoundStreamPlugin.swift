@@ -300,6 +300,8 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mPlayerBuffer = nil
         mp3Header = nil
+        title = argsArr["title"] as? String ?? ""
+        artist = argsArr["artist"] as? String ?? ""
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate
         debugLogging = argsArr["showLogs"] as? Bool ?? debugLogging
         mPlayerInputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: mPlayerSampleRate, channels: 1, interleaved: true)
