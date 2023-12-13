@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import AVFoundation
+import MediaPlayer
 
 public enum SoundStreamErrors: String {
     case FailedToPlay
@@ -102,8 +103,6 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
     }
     
-   
-    
     private func initEngine() {
         mAudioEngine.prepare()
         startEngine()
@@ -150,8 +149,17 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mAudioEngine.connect(mPlayerNode, to: speedControl, format: mPlayerOutputFormat)
         mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
-        
-        
+    }
+    
+    func updateNowPlayingInfo(title: String, artist: String, duration: TimeInterval, elapsedTime: TimeInterval) {
+        let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
+
+        nowPlayingInfoCenter.nowPlayingInfo = [
+            MPMediaItemPropertyTitle: title,
+            MPMediaItemPropertyArtist: artist,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsedTime
+        ]
     }
     
     private func sendEventMethod(_ name: String, _ data: Any) {
