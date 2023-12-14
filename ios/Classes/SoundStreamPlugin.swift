@@ -179,13 +179,13 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             // return .commandFailed
         }
         commandCenter.skipBackwardCommand.addTarget{ [unowned self] event in
-            
+            seekInternal(seekTime: getCurrentTimeInternal() - 10.0)
             return .success
             
             // return .commandFailed
         }
         commandCenter.skipForwardCommand.addTarget{ [unowned self] event in
-            
+            seekInternal(seekTime: getCurrentTimeInternal() + 10.0)
             return .success
             
             //return .commandFailed
@@ -227,6 +227,71 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         sendPlayerStatus(SoundStreamStatus.Paused)
     }
     
+    private func getCurrentTimeInternal()->Double{
+        if (playerStatus == SoundStreamStatus.Paused)
+        {
+            // Fake previous time, as whilst paused, time is 0
+            return lastDuration;
+        }
+        
+        if let nodeTime = mPlayerNode.lastRenderTime, let playerTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
+            let currentTime = (Double(startFrameOfCurrentSegment) + Double(playerTime.sampleTime)) / PLAYER_OUTPUT_SAMPLE_RATE
+            lastCurrentTime = currentTime
+          return currentTime
+        } else {
+            return 0.0
+        }
+    }
+    
+    private func getDurationInternal()->Double{
+        if (mPlayerBuffer != nil)
+        {
+            let duration = Double(Double(mPlayerBuffer!.frameLength) / Double(mPlayerSampleRate))
+            lastDuration = duration
+            return duration
+        }
+        else
+        {
+            lastDuration = 0
+            return 0.0
+        }
+    }
+    
+    private func seekInternal(seekTime:Double){
+        var tmpSeekTime = seekTime
+        let duration = getDurationInternal()
+        if (tmpSeekTime < 0.0)
+        {
+            tmpSeekTime = 0.0
+        }
+        else if (tmpSeekTime > duration - 10.0)
+        {
+            tmpSeekTime = duration
+        }
+        mPlayerNode.stop()
+        
+        let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(tmpSeekTime * PLAYER_OUTPUT_SAMPLE_RATE), to: nil)
+        if (bufferSegment != nil)
+        {
+            let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
+            startFrameOfCurrentSegment = AVAudioFramePosition(Int64(tmpSeekTime * PLAYER_OUTPUT_SAMPLE_RATE))
+            mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+                if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
+                {
+                    // we had another chunk
+                }
+                else{
+                    self.sendPlayerStatus(SoundStreamStatus.Stopped)
+                }
+            };
+            
+            mPlayerNode.play()
+            sendPlayerStatus(SoundStreamStatus.Playing)
+        }
+        else{
+            sendPlayerStatus(SoundStreamStatus.Stopped)
+        }
+    }
     
     func updateNowPlayingInfo(title: String, artist: String, duration: TimeInterval, elapsedTime: TimeInterval) {
         let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
@@ -311,34 +376,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func getCurrentTime(_ result: @escaping FlutterResult)  {
-        if (playerStatus == SoundStreamStatus.Paused)
-        {
-            // Fake previous time, as whilst paused, time is 0
-            sendResult(result, lastCurrentTime)
-            return
-        }
-        
-        if let nodeTime = mPlayerNode.lastRenderTime, let playerTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
-            let currentTime = (Double(startFrameOfCurrentSegment) + Double(playerTime.sampleTime)) / PLAYER_OUTPUT_SAMPLE_RATE
-            lastCurrentTime = currentTime
-            sendResult(result, currentTime)
-        } else {
-            sendResult(result, Double(0.0))
-        }
+        sendResult(result, getCurrentTimeInternal())
     }
     
     private func getDuration(_ result: @escaping FlutterResult)  {
-        if (mPlayerBuffer != nil)
-        {
-            let duration = Double(Double(mPlayerBuffer!.frameLength) / Double(mPlayerSampleRate))
-            lastDuration = duration
-            sendResult(result, duration);
-        }
-        else
-        {
-            lastDuration = 0
-            sendResult(result, Double(0.0));
-        }
+        sendResult(result, getDurationInternal());
         updateNowPlayingInfo(title: title, artist: artist, duration: lastDuration, elapsedTime:lastCurrentTime)
     }
     
@@ -480,25 +522,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
         if (mPlayerBuffer != nil)
         {
-            mPlayerNode.stop()
-            
-            let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(seekTime * PLAYER_OUTPUT_SAMPLE_RATE), to: nil)
-            let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
-            startFrameOfCurrentSegment = AVAudioFramePosition(Int64(seekTime * PLAYER_OUTPUT_SAMPLE_RATE))
-            mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
-                {
-                    // we had another chunk
-                }
-                else{
-                    self.sendPlayerStatus(SoundStreamStatus.Stopped)
-                }
-                
-            };
-            
-            
-            mPlayerNode.play()
-            sendPlayerStatus(SoundStreamStatus.Playing)
+            seekInternal(seekTime:seekTime)
         }
         else{
             sendResult(result, FlutterError( code: SoundStreamErrors.FailedToWriteBuffer.rawValue,
@@ -509,19 +533,24 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     
     func segment(of buffer: AVAudioPCMBuffer, from startFrame: AVAudioFramePosition, to endFrame: AVAudioFramePosition?) -> AVAudioPCMBuffer? {
         let tmpEndFrame = endFrame ?? AVAudioFramePosition(buffer.frameLength)
-        let framesToCopy = AVAudioFrameCount(tmpEndFrame - startFrame)
-        guard let segment = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: framesToCopy) else { return nil }
-        
-        let sampleSize = buffer.format.streamDescription.pointee.mBytesPerFrame
-        
-        let srcPtr = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
-        let dstPtr = UnsafeMutableAudioBufferListPointer(segment.mutableAudioBufferList)
-        for (src, dst) in zip(srcPtr, dstPtr) {
-            memcpy(dst.mData, src.mData?.advanced(by: Int(startFrame) * Int(sampleSize)), Int(framesToCopy) * Int(sampleSize))
+        if (tmpEndFrame - startFrame < 0)
+        {
+            return nil
         }
-        
-        segment.frameLength = framesToCopy
-        return segment
+            let framesToCopy = AVAudioFrameCount(tmpEndFrame - startFrame)
+            guard let segment = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: framesToCopy) else { return nil }
+            
+            let sampleSize = buffer.format.streamDescription.pointee.mBytesPerFrame
+            
+            let srcPtr = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+            let dstPtr = UnsafeMutableAudioBufferListPointer(segment.mutableAudioBufferList)
+            for (src, dst) in zip(srcPtr, dstPtr) {
+                memcpy(dst.mData, src.mData?.advanced(by: Int(startFrame) * Int(sampleSize)), Int(framesToCopy) * Int(sampleSize))
+            }
+            
+            segment.frameLength = framesToCopy
+            return segment
+    
     }
     
     func joinBuffers(buffer1: AVAudioPCMBuffer, buffer2: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
