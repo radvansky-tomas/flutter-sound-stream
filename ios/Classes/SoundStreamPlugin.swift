@@ -205,7 +205,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
                 let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
                 startFrameOfCurrentSegment = AVAudioFramePosition(0)
                 mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                    if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
+                    if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
                     {
                         // we had another chunk
                     }
@@ -584,11 +584,12 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             from: mPlayerInputFormat,
             to: mPlayerOutputFormat
         )
+        
         mPlayerBuffer = mPlayerBuffer != nil ? joinBuffers(buffer1: mPlayerBuffer!, buffer2: convertedBuffer) : convertedBuffer
         
         let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
         mPlayerNode.scheduleBuffer(convertedBuffer,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-            if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
+            if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
             {
                 // we had another chunk
             }
