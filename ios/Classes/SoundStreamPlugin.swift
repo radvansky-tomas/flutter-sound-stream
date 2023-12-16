@@ -35,6 +35,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var mPlayerOutputFormat: AVAudioFormat!
     private var mPlayerInputFormat: AVAudioFormat!
     private let speedControl = AVAudioUnitVarispeed()
+    private let pitchControl = AVAudioUnitTimePitch()
     private var mPlayerBuffer:AVAudioPCMBuffer?
     private var mp3Header:[UInt8]?
     private var playerStatus: SoundStreamStatus = SoundStreamStatus.Unset
@@ -148,9 +149,11 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
         
         mAudioEngine.attach(mPlayerNode)
+        mAudioEngine.attach(pitchControl)
         mAudioEngine.attach(speedControl)
         
-        mAudioEngine.connect(mPlayerNode, to: speedControl, format: mPlayerOutputFormat)
+        mAudioEngine.connect(mPlayerNode, to: pitchControl, format: mPlayerOutputFormat)
+        mAudioEngine.connect(pitchControl, to: speedControl, format: mPlayerOutputFormat)
         mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
         
         UIApplication.shared.beginReceivingRemoteControlEvents()
@@ -199,22 +202,22 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             {
                 ///Skip
             }
-            else if (playerStatus == SoundStreamStatus.Stopped && mPlayerBuffer != nil && Double(mPlayerBuffer!.frameLength) > PLAYER_OUTPUT_SAMPLE_RATE * 4){
-                /// Start over
-                let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(0), to: nil)
-                let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
-                startFrameOfCurrentSegment = AVAudioFramePosition(0)
-                mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                    if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
-                    {
-                        // we had another chunk
-                    }
-                    else{
-                        self.sendPlayerStatus(SoundStreamStatus.Stopped)
-                    }
-                    
-                };
-            }
+//            else if (playerStatus == SoundStreamStatus.Stopped && mPlayerBuffer != nil && Double(mPlayerBuffer!.frameLength) > PLAYER_OUTPUT_SAMPLE_RATE * 4){
+//                /// Start over
+//                let bufferSegment = segment(of: mPlayerBuffer!, from: Int64(0), to: nil)
+//                let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
+//                startFrameOfCurrentSegment = AVAudioFramePosition(0)
+//                mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+//                    if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
+//                    {
+//                        // we had another chunk
+//                    }
+//                    else{
+//                        self.sendPlayerStatus(SoundStreamStatus.Stopped)
+//                    }
+//                    
+//                };
+//            }
             mPlayerNode.play()
         }
         sendPlayerStatus(SoundStreamStatus.Playing)
@@ -236,8 +239,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         if let nodeTime = mPlayerNode.lastRenderTime, let playerTime = mPlayerNode.playerTime(forNodeTime: nodeTime) {
             let currentTime = (Double(startFrameOfCurrentSegment) + Double(playerTime.sampleTime)) / PLAYER_OUTPUT_SAMPLE_RATE
-            lastCurrentTime = currentTime
-          return currentTime
+            lastCurrentTime =  currentTime < 0.0 ? 0.0 : currentTime
+            
+          return lastCurrentTime
         } else {
             return 0.0
         }
@@ -496,6 +500,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             return
         }
         speedControl.rate = speed
+        let pitchShift = 1200 * log2(speedControl.rate)
+        pitchControl.pitch = -pitchShift // Correct the pitch
+
     }
     
     private func writeChunk(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
