@@ -57,13 +57,19 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
 
   /// Initialize Player with specified [sampleRate]
   @override
-  Future<dynamic> initializePlayer(
-          {int sampleRate = 16000, bool showLogs = false,String? title, String? artist,}) =>
+  Future<dynamic> initializePlayer({
+    int sampleRate = 16000,
+    bool showLogs = false,
+    String? title,
+    String? artist,
+    SoundStreamFormat format = SoundStreamFormat.PCM,
+  }) =>
       methodChannel.invokeMethod("initializePlayer", {
         "sampleRate": sampleRate,
         "showLogs": showLogs,
         "title": title,
         "artist": artist,
+        "format": enumToString(format)
       });
 
   /// Player will start receiving audio chunks (PCM 16bit data)
@@ -86,15 +92,16 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
       methodChannel.invokeMethod("writeChunk", <String, dynamic>{"data": data});
 
   @override
-  Future<dynamic> changePlayerSpeed(double speed) => methodChannel.invokeMethod("changePlayerSpeed", <String, dynamic>{"speed": speed});
+  Future<dynamic> changePlayerSpeed(double speed) => methodChannel
+      .invokeMethod("changePlayerSpeed", <String, dynamic>{"speed": speed});
 
   @override
-  Future<dynamic> getPlayerBuffer() => methodChannel.invokeMethod("getPlayerBuffer");
+  Future<dynamic> getPlayerBuffer() =>
+      methodChannel.invokeMethod("getPlayerBuffer");
 
   @override
-  Future<dynamic> seek(double seekTime) =>
-    methodChannel.invokeMethod("seek", <String, dynamic>{"seekTime": seekTime});
-
+  Future<dynamic> seek(double seekTime) => methodChannel
+      .invokeMethod("seek", <String, dynamic>{"seekTime": seekTime});
 
   @override
   Stream<SoundStreamStatus> get playerStatus => _playerStatusController.stream;
@@ -109,8 +116,10 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
       .invokeMethod("usePhoneSpeaker", <String, dynamic>{"value": value});
 
   @override
-  Future<double?> checkCurrentTime() => methodChannel.invokeMethod<double>("checkCurrentTime");
+  Future<double?> checkCurrentTime() =>
+      methodChannel.invokeMethod<double>("checkCurrentTime");
 
   @override
-  Future<double?> getDuration() => methodChannel.invokeMethod<double>("getDuration");
+  Future<double?> getDuration() =>
+      methodChannel.invokeMethod<double>("getDuration");
 }

@@ -18,6 +18,10 @@ public enum SoundStreamStatus: String {
     case Paused
 }
 
+public enum SoundStreamFormat: String {
+    case MP3
+    case PCM
+}
 
 public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var channel: FlutterMethodChannel
@@ -28,6 +32,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     private var isUsingSpeaker: Bool = false
     
     //========= Player's vars
+    private var mPlayerFormat:SoundStreamFormat = SoundStreamFormat.PCM
     private let PLAYER_OUTPUT_SAMPLE_RATE: Double = 44100
     private let mPlayerBus = 0
     private let mPlayerNode = AVAudioPlayerNode()
@@ -369,6 +374,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mPlayerBuffer = nil
         mp3Header = nil
+        mPlayerFormat = argsArr["format"] as? SoundStreamFormat ?? SoundStreamFormat.PCM
         title = argsArr["title"] as? String ?? ""
         artist = argsArr["artist"] as? String ?? ""
         mPlayerSampleRate = argsArr["sampleRate"] as? Double ?? mPlayerSampleRate

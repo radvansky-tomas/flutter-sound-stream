@@ -12,6 +12,7 @@ class SoundStream {
   Future<dynamic> initializePlayer({
     int sampleRate = 16000,
     bool showLogs = false,
+    SoundStreamFormat format = SoundStreamFormat.PCM,
     String? title,
     String? artist,
   }) {

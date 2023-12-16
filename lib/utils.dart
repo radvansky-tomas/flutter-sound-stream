@@ -8,4 +8,6 @@ enum SoundStreamStatus {
   Stopped,
 }
 
+enum SoundStreamFormat { MP3, PCM }
+
 String enumToString(Object o) => o.toString().split('.').last;
