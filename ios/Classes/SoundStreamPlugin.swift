@@ -651,80 +651,28 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     /// MP3 STUFF NOT USED ATM
     var tmpData = Data()
     
-    func mp3ChunkToPcm(mp3Data: Data) -> Data? {
-        var sourceFormat = AudioStreamBasicDescription(
-            mSampleRate: 44100.0,
-            mFormatID: kAudioFormatMPEGLayer3,
-            mFormatFlags: AudioFormatFlags(0),
-            mBytesPerPacket: 0,
-            mFramesPerPacket: 1152,
-            mBytesPerFrame: 0,
-            mChannelsPerFrame: 1,
-            mBitsPerChannel: 0,
-            mReserved: 0)
-        
-        var destinationFormat = AudioStreamBasicDescription(
-            mSampleRate: 44100.0,
-            mFormatID: kAudioFormatLinearPCM,
-            mFormatFlags: kLinearPCMFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
-            mBytesPerPacket: 2,
-            mFramesPerPacket: 1,
-            mBytesPerFrame: 2,
-            mChannelsPerFrame: 1,
-            mBitsPerChannel: 16,
-            mReserved: 0)
-        
-        var audioConverter: AudioConverterRef?
-        AudioConverterNew(&sourceFormat, &destinationFormat, &audioConverter)
-        
-        var pcmBuffer = Data(count: mp3Data.count * 6) // Estimated buffer size
-        var pcmBufferUsed = 0
-        
-        let inputDataProc: AudioConverterComplexInputDataProc = {
-            inAudioConverter, ioNumberDataPackets, ioData, outDataPacketDescription, inUserData in
-            
-            let mp3DataPointer = Unmanaged<NSData>.fromOpaque(inUserData!).takeUnretainedValue()
-            ioData.pointee.mBuffers.mData = UnsafeMutableRawPointer(mutating: mp3DataPointer.bytes)
-            ioData.pointee.mBuffers.mDataByteSize = UInt32(mp3DataPointer.length)
-            ioData.pointee.mBuffers.mNumberChannels = 1
-            
-            return noErr
-        }
-        
-        pcmBuffer.withUnsafeMutableBytes { buffer in
-            var ioOutputDataPackets: UInt32 = 1
-            var bufferList = AudioBufferList(
-                mNumberBuffers: 1,
-                mBuffers: AudioBuffer(
-                    mNumberChannels: 1,
-                    mDataByteSize: UInt32(mp3Data.count * 6),
-                    mData: buffer.baseAddress
-                )
-            )
-            
-            let status = AudioConverterFillComplexBuffer(
-                audioConverter!,
-                inputDataProc,
-                Unmanaged.passRetained(mp3Data as NSData).toOpaque(),
-                &ioOutputDataPackets,
-                UnsafeMutablePointer<AudioBufferList>(&bufferList),
-                nil
-            )
-            
-            if status == noErr {
-                pcmBufferUsed = Int(bufferList.mBuffers.mDataByteSize)
-            }
-        }
-        
-        AudioConverterDispose(audioConverter!)
-        
-        return pcmBuffer.subdata(in: 0..<pcmBufferUsed)
+ func mp3ChunkToPcm(data: Data) throws ->  AVAudioPCMBuffer? {
+   
+    let mp3Buffer = AVAudioCompressedBuffer(format: mPlayerInputFormat!, packetCapacity: AVAudioPacketCount(data.count), maximumPacketSize: 1152)
+
+    data.copyBytes(to: mp3Buffer.data.bindMemory(to: UInt8.self, capacity: data.count), count: data.count)
+
+
+    let pcmBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerOutputFormat, frameCapacity: AVAudioFrameCount(data.count))
+
+    let audioConverter = AVAudioConverter(from: mPlayerInputFormat!, to: mPlayerOutputFormat!)
+
+    let inputBlock: AVAudioConverterInputBlock = { inNumPackets, outStatus in
+        outStatus.pointee = .haveData
+        return mp3Buffer
     }
+
+    audioConverter?.convert(to: pcmBuffer!, error: nil, withInputFrom: inputBlock)
+
+    return pcmBuffer
+}
     
     private func bytesToMP3AudioBuffer(_ buf: [UInt8]) throws -> AVAudioPCMBuffer? {
-        // Create a temporary file to hold the MP3 data
-        let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString).appendingPathExtension("mp3")
-        
         var data = Data(buf)
         
         if mp3Header != nil {
@@ -732,35 +680,9 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         } else if buf.count >= 4 {
             mp3Header = Array(buf[0..<4])
         }
-        print(tmpData.count)
-        let cache = Int(mPlayerSampleRate) * 2
-        if (tmpData.count > cache)
-        {
-            try tmpData.write(to: tempURL)
+        let audioBuffer = try? mp3ChunkToPcm(data:data)
             
-            // Open the MP3 file
-            guard let audioFile = try? AVAudioFile(forReading: tempURL) else {
-                throw NSError(domain: "Error opening MP3 file", code: 1, userInfo: nil)
-            }
-            
-            // Create a buffer in PCM format
-            guard let audioBuffer = AVAudioPCMBuffer(pcmFormat: mPlayerOutputFormat!, frameCapacity: UInt32(tmpData.count)) else {
-                throw NSError(domain: "Error creating PCM buffer", code: 2, userInfo: nil)
-            }
-            
-            // Copy the PCM data to the buffer
-            tmpData.withUnsafeBytes { rawBufferPointer in
-                let mutableRawBufferPointer = rawBufferPointer.bindMemory(to: Float.self)
-                audioBuffer.floatChannelData?.pointee.update(from: mutableRawBufferPointer.baseAddress!, count: Int(audioBuffer.frameCapacity))
-            }
-            
-            return audioBuffer
-        }
-        else{
-            tmpData = tmpData + data;
-            
-            return nil
-        }
+        return audioBuffer
     }
 }
 
