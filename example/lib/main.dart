@@ -6,19 +6,21 @@ import 'package:sound_stream/sound_stream.dart';
 import 'package:sound_stream/utils.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   @override
-  _MyAppState createState() => _MyAppState();
+  State createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
   SoundStream soundStream = SoundStream();
 
-  List<Uint8List> _micChunks = [];
-  bool _isRecording = false;
+  final List<Uint8List> _micChunks = [];
+  //bool _isRecording = false;
   bool _isPlaying = false;
   bool _useSpeaker = false;
 
@@ -42,12 +44,12 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlugin() async {
-
     _playerStatus = soundStream.playerStatus.listen((status) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isPlaying = status == SoundStreamStatus.Playing;
         });
+      }
     });
 
     await Future.wait([
@@ -80,15 +82,12 @@ class _MyAppState extends State<MyApp> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-               
                 IconButton(
-                  iconSize: 96.0,
-                  icon: Icon(Icons.music_note),
-                  onPressed: (){
-                    // Load mp3
-
-                  }
-                ),
+                    iconSize: 96.0,
+                    icon: const Icon(Icons.music_note),
+                    onPressed: () {
+                      // Load mp3
+                    }),
                 IconButton(
                   iconSize: 96.0,
                   icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
@@ -106,40 +105,44 @@ class _MyAppState extends State<MyApp> {
                 });
               },
             ),
-            Row(children: [
-              IconButton(
-                iconSize: 96.0,
-                icon: Icon(Icons.lock_clock),
-                onPressed: () async {
-                  final time =  await soundStream.checkCurrentTime();
-                  print(time);
-                },
-              ),
-              IconButton(
-                iconSize: 96.0,
-                icon: Icon(Icons.skip_next),
-                onPressed: () async {
-                  await soundStream.seek(1);
-                },
-              ),
-            ],),
-            Row(children: [
-              IconButton(
-                iconSize: 96.0,
-                icon: Icon(Icons.data_array),
-                onPressed: () async {
-                  final buffer =  await soundStream.getPlayerBuffer();
-                  print(buffer.length);
-                },
-              ),
-              IconButton(
-                iconSize: 96.0,
-                icon: Icon(Icons.speed),
-                onPressed: () async {
-                   await soundStream.changePlayerSpeed(2.0);
-                },
-              ),
-            ],)
+            Row(
+              children: [
+                IconButton(
+                  iconSize: 96.0,
+                  icon: const Icon(Icons.lock_clock),
+                  onPressed: () async {
+                    final time = await soundStream.checkCurrentTime();
+                    debugPrint(time.toString());
+                  },
+                ),
+                IconButton(
+                  iconSize: 96.0,
+                  icon: const Icon(Icons.skip_next),
+                  onPressed: () async {
+                    await soundStream.seek(1);
+                  },
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                IconButton(
+                  iconSize: 96.0,
+                  icon: const Icon(Icons.data_array),
+                  onPressed: () async {
+                    final buffer = await soundStream.getPlayerBuffer();
+                    debugPrint(buffer.length.toString());
+                  },
+                ),
+                IconButton(
+                  iconSize: 96.0,
+                  icon: const Icon(Icons.speed),
+                  onPressed: () async {
+                    await soundStream.changePlayerSpeed(2.0);
+                  },
+                ),
+              ],
+            )
           ],
         ),
       ),
