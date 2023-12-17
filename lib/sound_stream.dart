@@ -10,7 +10,7 @@ import 'sound_stream_platform_interface.dart';
 class SoundStream {
   /// Player
   Future<dynamic> initializePlayer({
-    int sampleRate = 16000,
+    int sampleRate = 44100,
     bool showLogs = false,
     SoundStreamFormat format = SoundStreamFormat.PCM,
     String? title,
@@ -21,6 +21,7 @@ class SoundStream {
       showLogs: showLogs,
       title: title,
       artist: artist,
+      format: format,
     );
   }
 

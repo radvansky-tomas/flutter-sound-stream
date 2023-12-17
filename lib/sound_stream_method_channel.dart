@@ -58,7 +58,7 @@ class MethodChannelSoundStream extends SoundStreamPlatform {
   /// Initialize Player with specified [sampleRate]
   @override
   Future<dynamic> initializePlayer({
-    int sampleRate = 16000,
+    int sampleRate = 44100,
     bool showLogs = false,
     String? title,
     String? artist,

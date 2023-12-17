@@ -29,7 +29,7 @@ abstract class SoundStreamPlatform extends PlatformInterface {
 
   /// Player
   Future<dynamic> initializePlayer({
-    int sampleRate = 16000,
+    int sampleRate = 44100,
     bool showLogs = false,
     String? title,
     String? artist,
