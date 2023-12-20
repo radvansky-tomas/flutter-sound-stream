@@ -28,8 +28,13 @@ abstract class SoundStreamPlatform extends PlatformInterface {
   }
 
   /// Player
-  Future<dynamic> initializePlayer(
-      {int sampleRate = 16000, bool showLogs = false, String? title, String? artist}) {
+  Future<dynamic> initializePlayer({
+    int sampleRate = 44100,
+    bool showLogs = false,
+    String? title,
+    String? artist,
+    SoundStreamFormat format = SoundStreamFormat.PCM,
+  }) {
     throw UnimplementedError();
   }
 
@@ -66,15 +71,15 @@ abstract class SoundStreamPlatform extends PlatformInterface {
     throw UnimplementedError();
   }
 
-  Future<double?> checkCurrentTime(){
+  Future<double?> checkCurrentTime() {
     throw UnimplementedError();
   }
 
-  Future<double?> getDuration(){
+  Future<double?> getDuration() {
     throw UnimplementedError();
   }
 
-  Future<dynamic> seek(double seekTime){
+  Future<dynamic> seek(double seekTime) {
     throw UnimplementedError();
   }
 }
