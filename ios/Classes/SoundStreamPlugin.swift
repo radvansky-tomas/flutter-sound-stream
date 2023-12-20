@@ -553,6 +553,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         mPlayerBuffer = nil
         mp3Header = nil
+        startFrameOfCurrentSegment = 0
         if let formatString = argsArr["format"] as? String, let format = SoundStreamFormat(rawValue: formatString) {
             mPlayerFormat = format
             var readFormat = AudioStreamBasicDescription()
