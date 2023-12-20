@@ -25,11 +25,24 @@ public enum SoundStreamFormat: String {
 
 // This function reads data from a buffer and returns the number of bytes read.
 func data_AudioFile_ReadProc(_ inClientData: UnsafeMutableRawPointer, _ inPosition: Int64, _ requestCount: UInt32, _ buffer: UnsafeMutableRawPointer, _ actualCount: UnsafeMutablePointer<UInt32>) -> OSStatus {
-    let data = inClientData.assumingMemoryBound(to: Data.self).pointee
-    let bufferPointer = UnsafeMutableRawBufferPointer(start: buffer, count: Int(requestCount))
-    let copied = data.copyBytes(to: bufferPointer, from: Int(inPosition) ..< Int(inPosition) + Int(requestCount))
+  let data = inClientData.assumingMemoryBound(to: Data.self).pointee
+  let bufferPointer = UnsafeMutableRawBufferPointer(start: buffer, count: Int(requestCount))
+  
+  // Calculate the valid range to copy
+  let start = Int(inPosition)
+  let end = min(start + Int(requestCount), data.count)
+  
+  // Ensure the range is valid
+  if start < data.count {
+    let range = start..<end
+    let copied = data.copyBytes(to: bufferPointer, from: range)
     actualCount.pointee = UInt32(copied)
-    return noErr
+  } else {
+    // Handle the case where start is beyond the end of the data
+    actualCount.pointee = 0
+  }
+  
+  return noErr
 }
 
 // This function returns the size of the data.
@@ -289,31 +302,31 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     func setupInterruptionNotification() {
-           NotificationCenter.default.addObserver(self, selector: #selector(handleAudioSessionInterruption), name: AVAudioSession.interruptionNotification, object: nil)
-       }
+        NotificationCenter.default.addObserver(self, selector: #selector(handleAudioSessionInterruption), name: AVAudioSession.interruptionNotification, object: nil)
+    }
     
     @objc func handleAudioSessionInterruption(notification: Notification) {
-           guard let info = notification.userInfo,
-                 let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
-                 let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
-               return
-           }
-
-           switch type {
-           case .began:
-               // Interruption began, take appropriate actions (e.g., pause audio player node)
-               mPlayerNode.pause()
-           case .ended:
-               // Interruption ended, take appropriate actions (e.g., resume audio player node)
-               if let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt {
-                   let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                   if options.contains(.shouldResume) {
-                       mPlayerNode.play()
-                   }
-               }
-           default: ()
-           }
-       }
+        guard let info = notification.userInfo,
+              let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            // Interruption began, take appropriate actions (e.g., pause audio player node)
+            mPlayerNode.pause()
+        case .ended:
+            // Interruption ended, take appropriate actions (e.g., resume audio player node)
+            if let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    mPlayerNode.play()
+                }
+            }
+        default: ()
+        }
+    }
     
     func setupRemoteTransportControls() {
         
@@ -434,7 +447,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             let chunkBufferLength = Int(mPlayerBuffer!.frameLength)
             startFrameOfCurrentSegment = AVAudioFramePosition(Int64(tmpSeekTime * PLAYER_OUTPUT_SAMPLE_RATE))
             mPlayerNode.scheduleBuffer(bufferSegment!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                if (chunkBufferLength < Int(self.mPlayerBuffer!.frameLength))
+                if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
                 {
                     // we had another chunk
                 }
@@ -768,61 +781,53 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func pushPlayerChunk(_ chunk: [UInt8], _ result: @escaping FlutterResult) {
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                var buffer:AVAudioPCMBuffer?
-                var convertedBuffer:AVAudioPCMBuffer?
-                if (self.mPlayerFormat == SoundStreamFormat.PCM)
-                {
-                    buffer = try? self.bytesToAudioBuffer(chunk)
-                    if(buffer != nil)
-                    {
-                        convertedBuffer = self.convertBufferFormat(
-                            buffer!,
-                            from: self.mPlayerInputFormat,
-                            to: self.mPlayerOutputFormat
-                        )
-                    }
-                    
-                }
-                else{
-                    buffer = try? self.bytesToMP3AudioBuffer(chunk)
-                    if(buffer != nil)
-                    {
-                        convertedBuffer = buffer
-                    }
-                }
-                
-                
-                
-                self.mPlayerBuffer = self.mPlayerBuffer != nil && convertedBuffer != nil ? self.joinBuffers(buffer1: self.mPlayerBuffer!, buffer2: convertedBuffer!) : convertedBuffer
-                if (self.mPlayerBuffer != nil)
-                {
-                    let chunkBufferLength = Int(self.mPlayerBuffer!.frameLength)
-                    self.mPlayerNode.scheduleBuffer(convertedBuffer!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
-                        if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
-                        {
-                            // we had another chunk
-                        }
-                        else{
-                            DispatchQueue.main.async {
-                                self.sendPlayerStatus(SoundStreamStatus.Stopped)
-                            }
-                        }
-                        
-                    };
-                }
-                
-                // Switch back to the main queue to update the UI
-                DispatchQueue.main.async {
-                    // Update UI here
-                    result(true)
-                }
-                
+        var buffer:AVAudioPCMBuffer?
+        var convertedBuffer:AVAudioPCMBuffer?
+        if (self.mPlayerFormat == SoundStreamFormat.PCM)
+        {
+            buffer = try? bytesToAudioBuffer(chunk)
+            if(buffer != nil)
+            {
+                convertedBuffer = convertBufferFormat(
+                    buffer!,
+                    from: self.mPlayerInputFormat,
+                    to: self.mPlayerOutputFormat
+                )
+            }
+            
+        }
+        else{
+            buffer = try? bytesToMP3AudioBuffer(chunk)
+            if(buffer != nil)
+            {
+                convertedBuffer = buffer
             }
         }
+        
+        self.mPlayerBuffer = self.mPlayerBuffer != nil && convertedBuffer != nil ? joinBuffers(buffer1: self.mPlayerBuffer!, buffer2: convertedBuffer!) : convertedBuffer
+        if (self.mPlayerBuffer != nil)
+        {
+            let chunkBufferLength = Int(self.mPlayerBuffer!.frameLength)
+            self.mPlayerNode.scheduleBuffer(convertedBuffer!,completionCallbackType: AVAudioPlayerNodeCompletionCallbackType.dataPlayedBack) { _ in
+                if (chunkBufferLength < Int(self.mPlayerBuffer?.frameLength ?? 0))
+                {
+                    // we had another chunk
+                }
+                else{
+                    self.sendPlayerStatus(SoundStreamStatus.Stopped)
+                    
+                }
+                
+            };
+        }
+        
+        // Update UI here
+        result(true)
+        
+        
     }
+    
+    
     
     private func convertBufferFormat(_ buffer: AVAudioPCMBuffer, from: AVAudioFormat, to: AVAudioFormat) -> AVAudioPCMBuffer {
         
