@@ -201,12 +201,12 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         super.init()
         self.attachPlayer()
         self.initEngine()
+        
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        setupRemoteTransportControls()
     }
     
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        if debugLogging {
-            print("handle() \(call.method)")
-        }
         switch call.method {
         case "usingSpeaker":
             sendResult(result, isUsingSpeaker)
@@ -262,9 +262,16 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         let avAudioSession = AVAudioSession.sharedInstance()
         let options: AVAudioSession.CategoryOptions = [AVAudioSession.CategoryOptions.allowBluetooth, AVAudioSession.CategoryOptions.mixWithOthers,AVAudioSession.CategoryOptions.allowBluetoothA2DP]
-        
-        try? avAudioSession.setCategory(AVAudioSession.Category.playback, options: options)
-        try? avAudioSession.setMode(AVAudioSession.Mode.default)
+        do
+        {
+            try avAudioSession.setCategory(AVAudioSession.Category.playback, options: options)
+            try avAudioSession.setMode(AVAudioSession.Mode.default)
+        } catch {
+            if(debugLogging)
+            {
+                print("setCategory / Mode failed: \(error)")
+            }
+        }
         setUsePhoneSpeaker(false)
         
         setupInterruptionNotification()
@@ -281,7 +288,13 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             return
         }
         
-        try? mAudioEngine.start()
+        do {
+            try mAudioEngine.start()
+        } catch {
+            if debugLogging {
+                print("There was an error starting the audio engine: \(error)")
+            }
+        }
         if debugLogging {
             print("startEngine() - Completed")
         }
@@ -304,42 +317,48 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         }
         self.mPlayerNode = AVAudioPlayerNode()
         let session = AVAudioSession.sharedInstance()
-        try? session.setActive(false)
-        try! session.setCategory(
-            .playAndRecord,
-            options: [
-                .defaultToSpeaker,
-                .allowBluetooth,
-                .allowBluetoothA2DP,
-                .allowAirPlay
-            ])
-        try! session.setActive(true)
-        
-        mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
-        
-        mAudioEngine.attach(mPlayerNode!)
-        mAudioEngine.attach(pitchControl)
-        mAudioEngine.attach(speedControl)
-        
-        mAudioEngine.connect(mPlayerNode!, to: pitchControl, format: mPlayerOutputFormat)
-        mAudioEngine.connect(pitchControl, to: speedControl, format: mPlayerOutputFormat)
-        mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
-        
-        
-        UIApplication.shared.beginReceivingRemoteControlEvents()
-        setupRemoteTransportControls()
-        if debugLogging {
-            print("attachPlayer() - Completed")
+        do
+        {
+            try session.setActive(false)
+            try session.setCategory(
+                .playAndRecord,
+                options: [
+                    .defaultToSpeaker,
+                    .allowBluetooth,
+                    .allowBluetoothA2DP,
+                    .allowAirPlay
+                ])
+            try session.setActive(true)
+            
+            mPlayerOutputFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatFloat32, sampleRate: PLAYER_OUTPUT_SAMPLE_RATE, channels: 1, interleaved: true)
+            
+            mAudioEngine.attach(mPlayerNode!)
+            mAudioEngine.attach(pitchControl)
+            mAudioEngine.attach(speedControl)
+            
+            mAudioEngine.connect(mPlayerNode!, to: pitchControl, format: mPlayerOutputFormat)
+            mAudioEngine.connect(pitchControl, to: speedControl, format: mPlayerOutputFormat)
+            mAudioEngine.connect(speedControl, to: mAudioEngine.mainMixerNode, format: mPlayerOutputFormat)
+            
+            
+            
+            if debugLogging {
+                print("attachPlayer() - Completed")
+            }
+        }
+        catch {
+            print("Setting up session failed: \(error)")
         }
     }
+    
     
     func detachPlayer() {
         guard mAudioEngine.isRunning else {
             return
         }
         guard let audioPlayerNode = self.mPlayerNode else {
-               return
-           }
+            return
+        }
         // Stop the player node
         audioPlayerNode.stop()
         
@@ -367,12 +386,14 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         case .began:
             // Interruption began, take appropriate actions (e.g., pause audio player node)
             mPlayerNode?.pause()
+            sendPlayerStatus(SoundStreamStatus.Paused)
         case .ended:
             // Interruption ended, take appropriate actions (e.g., resume audio player node)
             if let optionsValue = info[AVAudioSessionInterruptionOptionKey] as? UInt {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                 if options.contains(.shouldResume) {
                     mPlayerNode?.play()
+                    sendPlayerStatus(SoundStreamStatus.Playing)
                 }
             }
         default: ()
@@ -546,16 +567,20 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
             print("updateNowPlayingInfo() - \(title), \(artist), \(duration), \(elapsedTime)")
         }
         let nowPlayingInfoCenter = MPNowPlayingInfoCenter.default()
-        
-        let image = UIImage(named: "AppIcon")!
-        let artwork = MPMediaItemArtwork.init(boundsSize: image.size, requestHandler: { (size) -> UIImage in
-            return image
-        })
+        let prefix = ProcessInfo.processInfo.environment["ASSET_PREFIX"] ?? ""
+        let image = UIImage(named: prefix + "AppIcon")
+        if (image != nil)
+        {
+            let artwork = MPMediaItemArtwork.init(boundsSize: image!.size, requestHandler: { (size) -> UIImage in
+                return image!
+            })
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        }
         
         nowPlayingInfo[MPMediaItemPropertyTitle] = title
         nowPlayingInfo[MPMediaItemPropertyArtist] = artist
         nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
-        nowPlayingInfo[MPMediaItemPropertyArtwork] = artwork
+        
         nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsedTime
         
         
@@ -579,27 +604,27 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
                 nowPlayingInfoCenter.playbackState = MPNowPlayingPlaybackState.unknown
                 break
             }
-        } else {
-            // Fallback on earlier versions
-            switch (mPlayerStatus)
-            {
-            case SoundStreamStatus.Playing:
-                nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
-                break
-            case SoundStreamStatus.Paused:
-                nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
-                break
-            case SoundStreamStatus.Stopped:
-                nowPlayingInfoCenter.nowPlayingInfo =  nil
-                break
-            case SoundStreamStatus.Initialized:
-                nowPlayingInfoCenter.nowPlayingInfo =  nil
-                break
-            case SoundStreamStatus.Unset:
-                nowPlayingInfoCenter.nowPlayingInfo =  nil
-                break
-            }
         }
+        // Fallback on earlier versions
+        switch (mPlayerStatus)
+        {
+        case SoundStreamStatus.Playing:
+            nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
+            break
+        case SoundStreamStatus.Paused:
+            nowPlayingInfoCenter.nowPlayingInfo =  nowPlayingInfo
+            break
+        case SoundStreamStatus.Stopped:
+            nowPlayingInfoCenter.nowPlayingInfo =  nil
+            break
+        case SoundStreamStatus.Initialized:
+            nowPlayingInfoCenter.nowPlayingInfo =  nil
+            break
+        case SoundStreamStatus.Unset:
+            nowPlayingInfoCenter.nowPlayingInfo =  nil
+            break
+        }
+        
         
         
     }
@@ -640,7 +665,7 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
         
         attachPlayer()
         startEngine()
-     
+        
         mPlayerBuffer = nil
         mp3Header = nil
         startFrameOfCurrentSegment = 0
@@ -802,6 +827,10 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
     }
     
     private func writeChunk(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+        if (debugLogging)
+        {
+            print("Writing chunk")
+        }
         guard let argsArr = call.arguments as? Dictionary<String,AnyObject>,
               let data = argsArr["data"] as? FlutterStandardTypedData
         else {
@@ -916,11 +945,15 @@ public class SoundStreamPlugin: NSObject, FlutterPlugin {
                 
             };
         }
+        else{
+            if(debugLogging)
+            {
+                print("pushPlayerChunk mPlayerBuffer is null")
+            }
+        }
         
         // Update UI here
         result(true)
-        
-        
     }
     
     

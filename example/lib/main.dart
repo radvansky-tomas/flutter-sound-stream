@@ -112,7 +112,7 @@ class _MyAppState extends State<MyApp> {
                   icon: const Icon(Icons.lock_clock),
                   onPressed: () async {
                     final time = await soundStream.checkCurrentTime();
-                    debugPrint(time.toString());
+                    print(time.toString());
                   },
                 ),
                 IconButton(
@@ -131,7 +131,7 @@ class _MyAppState extends State<MyApp> {
                   icon: const Icon(Icons.data_array),
                   onPressed: () async {
                     final buffer = await soundStream.getPlayerBuffer();
-                    debugPrint(buffer.length.toString());
+                    print(buffer.length.toString());
                   },
                 ),
                 IconButton(
